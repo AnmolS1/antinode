@@ -5,10 +5,11 @@
  * change. Until then, `main.tsx` still mounts the T01 placeholder; this shell is
  * exercised via the dev mock and the Vitest suite.
  */
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import type { EngineFacade } from '../contracts/engine';
 import type { SourceKind } from '../contracts/source';
+import { useSpotify } from '../spotify/useSpotify';
 import type { ToastInput } from './context';
 import {
   useFrameRate,
@@ -18,7 +19,7 @@ import {
   type Shortcut,
 } from './hooks';
 import { loadRememberedSource, saveRememberedSource, snapshotCanvas } from './util';
-import { DEVICE_FIXTURES, NOW_PLAYING_FIXTURE, PALETTE_FIXTURE, SPOTIFY_STATES } from './dev/fixtures';
+import { DEVICE_FIXTURES } from './dev/fixtures';
 import { Landing } from './components/Landing';
 import { DevicePicker } from './components/DevicePicker';
 import { SignalCheck } from './components/SignalCheck';
@@ -29,12 +30,14 @@ import { PerfHud } from './components/PerfHud';
 import { ShortcutOverlay, type ShortcutHint } from './components/ShortcutOverlay';
 import { Toasts, type Toast } from './components/Toasts';
 import { LiveRegion } from './components/LiveRegion';
+import { ParamsPane, type PaneApi } from './params/ParamsPane';
+import type { ParamHost } from './params/types';
+import { decodePresetFromHash } from './params/presets';
 import './styles.css';
 
 type Phase = 'onboarding' | 'device' | 'signal' | 'live';
-type SpotifyFixture = keyof typeof SPOTIFY_STATES;
 
-/** Spotify UI is behind a flag (00-overview: bonus tier for 5 seats); T08 fills it in. */
+/** Spotify UI is behind a flag (00-overview: bonus tier for 5 seats). */
 const FEATURE_SPOTIFY = true;
 
 const SHORTCUT_HINTS: ShortcutHint[] = [
@@ -42,6 +45,7 @@ const SHORTCUT_HINTS: ShortcutHint[] = [
   { keys: 'F', label: 'Fullscreen' },
   { keys: '1–9', label: 'Select scene' },
   { keys: '[ / ]', label: 'Previous / next preset' },
+  { keys: 'R', label: 'Randomize params' },
   { keys: 'S', label: 'Save a PNG of the canvas' },
   { keys: '?', label: 'Toggle this help' },
   { keys: 'Esc', label: 'Close overlays' },
@@ -51,19 +55,28 @@ function setCanvasLabel(message: string): void {
   document.querySelector('#stage')?.setAttribute('aria-label', message);
 }
 
-export function App({ engine }: { engine: EngineFacade }) {
+export function App({
+  engine,
+  host,
+  defaultSceneId,
+}: {
+  engine: EngineFacade;
+  /** The render-backed params host (present in production; omitted in unit tests). */
+  host?: ParamHost;
+  /** The scene the engine boots on, so the switcher highlights it correctly. */
+  defaultSceneId?: string;
+}) {
   const capabilities = useMemo(() => engine.capabilities(), [engine]);
   const scenes = useMemo(() => engine.scenes(), [engine]);
   const remembered = useMemo(() => loadRememberedSource(), []);
 
   const [phase, setPhase] = useState<Phase>('onboarding');
   const [steering, setSteering] = useState(false);
-  const [activeScene, setActiveScene] = useState<string>(scenes[0]?.id ?? '');
+  const [activeScene, setActiveScene] = useState<string>(defaultSceneId ?? scenes[0]?.id ?? '');
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [showPerf, setShowPerf] = useState(false);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [liveMessage, setLiveMessage] = useState('');
-  const [spotifyFixture, setSpotifyFixture] = useState<SpotifyFixture>('disconnected');
 
   const reducedMotion = useReducedMotion();
   const idle = useIdleFade(3000);
@@ -72,6 +85,9 @@ export function App({ engine }: { engine: EngineFacade }) {
   const toastId = useRef(0);
   const deviceReturn = useRef<Phase>('onboarding');
   const steeringFileInput = useRef<HTMLInputElement>(null);
+  // The params pane hands its imperative API here (once live) for keyboard wiring.
+  const paneApiRef = useRef<PaneApi | null>(null);
+  const hashApplied = useRef(false);
 
   const dismissToast = useCallback((id: number): void => {
     setToasts((list) => list.filter((t) => t.id !== id));
@@ -91,22 +107,17 @@ export function App({ engine }: { engine: EngineFacade }) {
     setCanvasLabel(message);
   }, []);
 
-  // Changing the (dev-fixture) Spotify state announces the track on the live region;
-  // scene changes are announced in selectScene. T08 drives this from real poll data.
-  const selectSpotifyState = useCallback(
-    (state: SpotifyFixture): void => {
-      setSpotifyFixture(state);
-      if (state === 'connected') {
-        announce(
-          `Now playing: ${NOW_PLAYING_FIXTURE.title} by ${NOW_PLAYING_FIXTURE.artists.join(', ')}`,
-        );
-      }
-    },
-    [announce],
-  );
+  // Real Spotify now-playing (T08), behind the feature flag. Track changes are
+  // announced on the live region for parity with scene-change announcements.
+  const sp = useSpotify({
+    onTrackChange: (np) => announce(`Now playing: ${np.title} by ${np.artists.join(', ')}`),
+  });
 
   const beginSignalCheck = useCallback(
     async (kind: SourceKind, opts?: { deviceId?: string; file?: File }): Promise<void> => {
+      // First user gesture: resume the (gesture-suspended) AudioContext so audio
+      // actually plays. Safe to call repeatedly; selectSource also resumes.
+      void engine.unlock();
       try {
         await engine.selectSource(kind, opts);
         setSteering(false);
@@ -151,6 +162,26 @@ export function App({ engine }: { engine: EngineFacade }) {
     [engine, scenes, announce],
   );
 
+  // Keep the switcher highlight correct when the scene changes from elsewhere
+  // (e.g. a preset that targets another scene). No-op without a host (unit tests).
+  useEffect(() => {
+    if (!host) return;
+    return host.onSceneChange((id) => setActiveScene(id));
+  }, [host]);
+
+  // The params pane hands over its imperative API once live; wire it to the
+  // keyboard and decode any inbound share hash (#p=…) exactly once.
+  const onPaneReady = useCallback((api: PaneApi): void => {
+    paneApiRef.current = api;
+    if (hashApplied.current) return;
+    hashApplied.current = true;
+    const hash = typeof location !== 'undefined' ? location.hash : '';
+    if (!hash) return;
+    void decodePresetFromHash(hash).then((preset) => {
+      if (preset) api.applyPreset(preset);
+    });
+  }, []);
+
   const toggleFullscreen = useCallback((): void => {
     const el = document.documentElement;
     if (document.fullscreenElement) {
@@ -178,21 +209,21 @@ export function App({ engine }: { engine: EngineFacade }) {
       label: `Scene ${s.name}`,
       run: () => selectScene(s.id),
     }));
-    const presetNudge = (): void =>
-      toast({ kind: 'info', message: 'Presets arrive in T07.' });
     return [
       { key: ' ', label: 'Pin UI', run: idle.togglePin },
       { key: 'f', label: 'Fullscreen', run: toggleFullscreen },
       { key: 'F', label: 'Fullscreen', run: toggleFullscreen },
       ...sceneKeys,
-      { key: '[', label: 'Previous preset', run: presetNudge },
-      { key: ']', label: 'Next preset', run: presetNudge },
+      { key: '[', label: 'Previous preset', run: () => paneApiRef.current?.cyclePrev() },
+      { key: ']', label: 'Next preset', run: () => paneApiRef.current?.cycleNext() },
+      { key: 'r', label: 'Randomize', run: () => paneApiRef.current?.randomize() },
+      { key: 'R', label: 'Randomize', run: () => paneApiRef.current?.randomize() },
       { key: 's', label: 'Snapshot', run: takeSnapshot },
       { key: 'S', label: 'Snapshot', run: takeSnapshot },
       { key: '?', label: 'Shortcuts', run: () => setShowShortcuts((v) => !v) },
       { key: 'Escape', label: 'Close overlays', run: closeOverlays },
     ];
-  }, [scenes, idle.togglePin, toggleFullscreen, takeSnapshot, selectScene, closeOverlays, toast]);
+  }, [scenes, idle.togglePin, toggleFullscreen, takeSnapshot, selectScene, closeOverlays]);
 
   useKeyboardShortcuts(shortcuts, phase === 'live');
 
@@ -302,30 +333,23 @@ export function App({ engine }: { engine: EngineFacade }) {
           </div>
         )}
 
-        {/* Param dock area reserved for T07. */}
-        <div className="dock" data-reserved-for="T07-params" aria-hidden="true" />
+        {/* Param dock (T07). The pane needs the render-backed host; without it
+            (unit tests inject no host) the slot stays empty. */}
+        <div className="dock" data-reserved-for="T07-params">
+          {host && <ParamsPane engine={engine} host={host} onReady={onPaneReady} />}
+        </div>
 
         {FEATURE_SPOTIFY && (
           <aside className="spotify-slot">
             <SpotifyArea
-              status={SPOTIFY_STATES[spotifyFixture]}
-              nowPlaying={spotifyFixture === 'connected' ? NOW_PLAYING_FIXTURE : null}
-              palette={spotifyFixture === 'connected' ? PALETTE_FIXTURE : []}
-              onConnect={() => selectSpotifyState('connected')}
+              status={sp.status}
+              nowPlaying={sp.nowPlaying}
+              palette={sp.palette}
+              stale={sp.stale}
+              onConnect={sp.connect}
+              onDisconnect={sp.disconnect}
+              onReconnect={sp.reconnect}
             />
-            {/* Dev-only fixture cycler; T08 removes it. */}
-            <div className="spotify-slot__dev">
-              {(Object.keys(SPOTIFY_STATES) as SpotifyFixture[]).map((state) => (
-                <button
-                  key={state}
-                  type="button"
-                  className={`chip${spotifyFixture === state ? ' is-active' : ''}`}
-                  onClick={() => selectSpotifyState(state)}
-                >
-                  {state}
-                </button>
-              ))}
-            </div>
           </aside>
         )}
       </div>
