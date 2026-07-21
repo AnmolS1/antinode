@@ -1,28 +1,52 @@
-# audio_visualizer
-visualizes audio
+# Antinode
 
----
+> It listens, and gives the sound a shape.
 
-## TODO
-- [x] connect app to spotify (done w/ react & express)
-- [x] sign in through website
-- [x] sync up to spotify in real-time (or as close as possible)
-	- essentially get what user is playing in real time
-- [ ] feed audio through visual
-	- this will be the hardest part
-	- may require refactoring of visual
-	- may be possible with severe manipulation of spotify's audio analysis
-	- log both outputs for comparison
-		- to file?
-- [ ] sync visual to music
-- [ ] clean up layout
-- [ ] find a way to serve full webapp
-- [ ] improve base visualizer
-- [ ] full control menu
-- [ ] choose music from website
-- [ ] introduce modifications to visuals
+![CI](https://github.com/AnmolS1/antinode/actions/workflows/ci.yml/badge.svg)
 
-### Steps to run
-- `npm i`
-- `npm run start`
-	- app will be available on localhost:3000
+Antinode is a real-time music visualizer for the browser. It taps live audio —
+a file, a shared tab, your mic or a loopback device — analyzes it in an
+AudioWorklet, and drives GPU-rendered scenes that react to loudness, spectrum,
+onsets, and beat. WebGL2 is the baseline everywhere; WebGPU is used where the
+browser supports it.
+
+## Dev quickstart
+
+```sh
+npm i
+npm run dev          # → http://localhost:5173
+```
+
+Other scripts:
+
+```sh
+npm run typecheck    # tsc --noEmit (strict)
+npm run lint         # eslint (flat config)
+npm test             # vitest (jsdom)
+npm run build        # tsc --noEmit && vite build
+npm run test:e2e     # playwright (browsers required)
+```
+
+## Plan of record
+
+See `antinode-plan/` — read `04-handoff.md` first, then `00-overview.md`, then
+`01-task-graph.md`.
+
+## Browser support
+
+| Browser            | WebGL2 (baseline) | WebGPU        |
+| ------------------ | ----------------- | ------------- |
+| Chrome             | ✅                | ✅            |
+| Firefox            | ✅                | Where enabled |
+| Waterfox (ESR)     | ✅                | Where enabled |
+| Safari (macOS/iOS) | ✅                | Where enabled |
+
+WebGL2 is the guaranteed path on every supported browser; WebGPU is used
+automatically when available and falls back cleanly when it is not.
+
+**No video export** — ever (Spotify's sync clause); Antinode renders reactively
+in real time only.
+
+## License
+
+MIT — see [LICENSE](./LICENSE).

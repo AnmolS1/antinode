@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>antinode · render-core dev harness</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: #050a0f;
+        overflow: hidden;
+      }
+      #render-canvas {
+        display: block;
+        width: 100vw;
+        height: 100vh;
+      }
+      #hud {
+        position: fixed;
+        top: 8px;
+        left: 10px;
+        color: #4ade80;
+        font: 12px/1.4 'IBM Plex Mono', ui-monospace, monospace;
+        pointer-events: none;
+        text-shadow: 0 0 6px rgba(74, 222, 128, 0.4);
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="render-canvas"></canvas>
+    <div id="hud">booting…</div>
+    <script type="module" src="./harness.ts"></script>
+  </body>
+</html>

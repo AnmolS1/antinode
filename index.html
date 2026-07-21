@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <title>Antinode — it listens, and gives the sound a shape</title>
+    <meta
+      name="description"
+      content="A music visualizer that listens to real audio and gives the sound a shape."
+    />
+    <meta name="theme-color" content="#050a0f" />
+
+    <!-- Open Graph / social (og-image is generated as a static asset in T12). -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Antinode" />
+    <meta property="og:title" content="Antinode — it listens, and gives the sound a shape" />
+    <meta
+      property="og:description"
+      content="A music visualizer that listens to real audio and gives the sound a shape."
+    />
+    <meta property="og:url" content="https://antinode.ponderance.dev/" />
+    <meta property="og:image" content="https://antinode.ponderance.dev/og-image.png" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Antinode — it listens, and gives the sound a shape" />
+    <meta
+      name="twitter:description"
+      content="A music visualizer that listens to real audio and gives the sound a shape."
+    />
+    <meta name="twitter:image" content="https://antinode.ponderance.dev/og-image.png" />
+  </head>
+  <body>
+    <!-- The engine (T02/T03) owns this canvas; React (T04) owns #ui-root beside it.
+         role="img" + a live aria-label (kept in sync by the UI) describe the visuals to
+         screen readers; a polite live region in #ui-root announces track/scene changes. -->
+    <canvas
+      id="stage"
+      role="img"
+      aria-label="Audio visualizer — no source selected yet"
+    ></canvas>
+    <div id="ui-root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

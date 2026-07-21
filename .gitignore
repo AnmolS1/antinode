@@ -1,23 +1,42 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
 # dependencies
-/node_modules
+node_modules
 /.pnp
 .pnp.js
 
-# testing
-/coverage
+# build output & caches
+dist
+build
+coverage
+.vite
+*.tsbuildinfo
 
-# production
-/build
+# test artifacts
+/playwright-report
+/test-results
+/blob-report
 
-# misc
-.DS_Store
+# secrets & local env (never commit — see antinode-plan for where secrets live)
+.env
 .env.local
-.env.development.local
-.env.test.local
-.env.production.local
+.env.*.local
 
+# editor / OS
+.DS_Store
+*.swp
+
+# Claude local memory buffer (kept local, not shared)
+.remember/
+
+# logs
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+pnpm-debug.log*
+
+# TouchDesigner project binaries (large .toe files stay untracked; see touchdesigner/)
+*.toe
+
+# scratch
+_to_delete/

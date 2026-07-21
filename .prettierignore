@@ -1,0 +1,8 @@
+dist
+build
+coverage
+playwright-report
+test-results
+package-lock.json
+antinode-plan
+touchdesigner/SKILL.md

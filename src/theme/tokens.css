@@ -1,0 +1,198 @@
+/* Antinode design tokens (T01 seed, extended by T04 per antinode-plan/02-design.md).
+   Dark-first: :root holds the dark defaults; [data-theme="light"] overrides for the
+   landing section. The app chrome is always dark (visualizers live in the dark).
+
+   Contrast note (02-design "worst-case bright canvas"): overlay panels are
+   translucent graphite over a possibly-white canvas. rgba(14,26,36,0.72) composited
+   over #fff ≈ #515A61; light ink (--color-graphite dark = #E9ECE7) on that ≈ 5.9:1
+   (passes 4.5:1). Phosphor as *text* on that ground is only ~4:1, so phosphor is used
+   for large headings, focus rings, meters and non-text indicators — never body text. */
+
+:root {
+  /* — Inherited from ponderance.dev (same token names), dark defaults — */
+  --color-graph: #0e1a24;
+  --color-card: #182530;
+  --color-grid: rgba(130, 169, 206, 0.07);
+  --color-graphite: #e9ece7;
+  --color-crease: #82a9ce;
+  --color-canvas-bg: #050a0f;
+
+  /* — Antinode's own half: "phosphor & graphite" — */
+  --color-phosphor: #4ade80;
+  --color-phosphor-deep: #1e8a52;
+  --art-accent: var(--color-phosphor);
+
+  /* Ink alpha steps for secondary/tertiary text. Alpha composites toward the backdrop,
+     so these were tuned against the worst case (see --panel-bg note): --ink-60 over the
+     0.85 panel over a white canvas composites to ~#A7ADAD on ~#323D45 ≈ 4.9:1 (passes
+     4.5:1). --ink-40 is only used off-panel on the dark landing ground (never over a
+     bright canvas), so it stays lighter. Recompute before changing either. */
+  --ink: var(--color-graphite);
+  --ink-60: rgba(233, 236, 231, 0.64);
+  --ink-40: rgba(233, 236, 231, 0.4);
+
+  /* Structure lines: hairlines at 0.13 alpha (02-design). */
+  --hairline: rgba(130, 169, 206, 0.13);
+  --hairline-strong: rgba(130, 169, 206, 0.28);
+
+  /* Overlay panels: translucent graphite + blur + hairline borders. 02-design specs
+     0.72, but a11y is non-negotiable and small secondary text (--ink-60) on a 0.72 panel
+     over a worst-case white canvas is only ~3.6:1. Raised to 0.85 (still clearly
+     translucent with the blur) so the composite floor is dark enough for 4.5:1 text. */
+  --panel-bg: rgba(14, 26, 36, 0.85);
+  --panel-bg-solid: #0e1a24;
+  --panel-blur: 10px;
+  --panel-radius: 14px;
+  --panel-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+
+  /* Scanline / CRT restraint: UI surfaces only, opacity <= 0.04. */
+  --scanline-opacity: 0.035;
+
+  /* Focus ring — phosphor, visible on dark (a11y). */
+  --focus-ring: 0 0 0 2px var(--color-canvas-bg), 0 0 0 4px var(--color-phosphor);
+
+  /* Spotify brand green (now-playing card attribution only). */
+  --spotify-green: #1db954;
+
+  /* Motion: UI transition duration; clamped to 0 under reduced-motion. */
+  --ui-dur: 200ms;
+  --ui-dur-slow: 360ms;
+
+  /* Spacing / radii scale. */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+
+  /* z-index layers (canvas = 0, ui-root = 1 from base). */
+  --z-panel: 10;
+  --z-overlay: 40;
+  --z-toast: 60;
+
+  /* Typography (02-design). Numbers that move are always mono. */
+  --font-display: 'Bricolage Grotesque', system-ui, sans-serif;
+  --font-body: 'Hanken Grotesk', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, 'SFMono-Regular', monospace;
+
+  /* — Tweakpane 4 CSS-var contract (style only; the pane itself arrives in T07).
+       Mapping the pane's variables onto our tokens so it reads as lab instrumentation. */
+  --tp-base-background-color: var(--panel-bg);
+  --tp-base-shadow-color: rgba(0, 0, 0, 0.4);
+  --tp-button-background-color: var(--color-phosphor);
+  --tp-button-background-color-active: var(--color-phosphor-deep);
+  --tp-button-background-color-focus: var(--color-phosphor-deep);
+  --tp-button-background-color-hover: var(--color-phosphor-deep);
+  --tp-button-foreground-color: var(--color-canvas-bg);
+  --tp-container-background-color: rgba(255, 255, 255, 0.04);
+  --tp-container-background-color-active: rgba(255, 255, 255, 0.09);
+  --tp-container-background-color-focus: rgba(255, 255, 255, 0.07);
+  --tp-container-background-color-hover: rgba(255, 255, 255, 0.06);
+  --tp-container-foreground-color: var(--ink);
+  --tp-groove-foreground-color: var(--hairline-strong);
+  --tp-input-background-color: rgba(0, 0, 0, 0.3);
+  --tp-input-background-color-active: rgba(0, 0, 0, 0.45);
+  --tp-input-background-color-focus: rgba(0, 0, 0, 0.4);
+  --tp-input-background-color-hover: rgba(0, 0, 0, 0.35);
+  --tp-input-foreground-color: var(--ink);
+  --tp-label-foreground-color: var(--ink-60);
+  --tp-monitor-background-color: rgba(0, 0, 0, 0.3);
+  --tp-monitor-foreground-color: var(--color-phosphor);
+}
+
+:root[data-theme='light'] {
+  --color-graph: #eef0ec;
+  --color-card: #f6f7f4;
+  --color-grid: rgba(46, 94, 140, 0.07);
+  --color-graphite: #1b2a33;
+  --color-crease: #2e5e8c;
+  --color-phosphor: #2fbf71;
+
+  --ink: var(--color-graphite);
+  --ink-60: rgba(27, 42, 51, 0.66);
+  --ink-40: rgba(27, 42, 51, 0.42);
+  --hairline: rgba(46, 94, 140, 0.13);
+  --hairline-strong: rgba(46, 94, 140, 0.28);
+}
+
+/* Reduced-motion: the UI calms its own transitions (scenes handle their own half
+   via the engine flag). "Reduced" means gentle, not blank. */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --ui-dur: 0ms;
+    --ui-dur-slow: 0ms;
+    --scanline-opacity: 0;
+  }
+}
+:root.reduced-motion {
+  --ui-dur: 0ms;
+  --ui-dur-slow: 0ms;
+  --scanline-opacity: 0;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  background: var(--color-graph);
+  color: var(--ink);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+}
+
+*:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+  border-radius: 4px;
+}
+
+/* The engine (T02/T03) owns this canvas; it sits behind the React chrome. */
+#stage {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  background: var(--color-canvas-bg);
+  z-index: 0;
+}
+
+#ui-root {
+  position: relative;
+  z-index: 1;
+}
+
+/* T01 placeholder landing styles — retained so src/App.tsx (still mounted until the
+   Wave B main.tsx rewire) stays styled. The real shell lives in src/ui/. */
+.landing {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 100vh;
+  padding: 2rem;
+  text-align: center;
+}
+.wordmark {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(2.5rem, 8vw, 5rem);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--color-phosphor);
+}
+.tagline {
+  margin: 0;
+  font-size: clamp(1rem, 3vw, 1.35rem);
+  color: var(--ink);
+}
+.scaffold-note {
+  margin: 1.5rem 0 0;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  opacity: 0.55;
+}
