@@ -1,0 +1,173 @@
+name: Deploy (Cloudflare)
+
+# PR  → ephemeral per-commit preview (Workers `versions upload`, URL commented on the PR).
+# main → production deploy to the `antinode` Worker (custom domain antinode.ponderance.dev,
+#        attached once via the Cloudflare dashboard — see docs/ops.md).
+#
+# This workflow is intentionally self-contained: the full lint/unit/e2e matrix lives in
+# ci.yml (owned separately) and runs in parallel. The `build` job here re-verifies types
+# + a clean production build before anything is uploaded, so a broken tree never deploys.
+#
+# Deploy jobs no-op gracefully when CLOUDFLARE_API_TOKEN is absent (config-only mode),
+# so CI stays green before the owner creates the scoped token.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+
+env:
+  # Pinned to the same known-good wrangler as ponderance.dev. No wrangler devDep is
+  # added to package.json — CI fetches it via npx / cloudflare-wrangler-action.
+  WRANGLER_VERSION: '4.104.0'
+
+jobs:
+  # Job-level `if:` cannot read `secrets.*` directly, so surface token presence as an
+  # output. Absent token → deploy jobs skip cleanly instead of hard-failing.
+  preflight:
+    name: Preflight — deploy token present?
+    runs-on: ubuntu-latest
+    outputs:
+      deploy_ready: ${{ steps.check.outputs.deploy_ready }}
+    steps:
+      - id: check
+        env:
+          CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          if [ -n "$CF_TOKEN" ]; then
+            echo "deploy_ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "deploy_ready=false" >> "$GITHUB_OUTPUT"
+            echo "::notice title=Deploy skipped::CLOUDFLARE_API_TOKEN not set — config-only mode. Add the scoped token secret to enable preview/prod deploys (docs/ops.md)."
+          fi
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Build (tsc --noEmit + vite build)
+        env:
+          # Public OAuth client ID (PKCE — there is no client secret). Kept env-driven
+          # so it never hard-codes into source; Vite inlines VITE_* at build time.
+          # Stored as a repo *Variable* (not a Secret) — it's public by design.
+          VITE_SPOTIFY_CLIENT_ID: ${{ vars.VITE_SPOTIFY_CLIENT_ID }}
+        run: npm run build
+      - name: Upload dist artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+          retention-days: 1
+
+  preview:
+    name: Preview deploy (PR)
+    needs: [preflight, build]
+    if: github.event_name == 'pull_request' && needs.preflight.outputs.deploy_ready == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Download dist artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - name: Upload preview version
+        id: preview
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -o pipefail
+          # `versions upload` publishes a new *version* and prints a unique preview URL
+          # WITHOUT shifting production traffic. Requires the `antinode` Worker to exist
+          # (one-time `wrangler deploy` bootstrap — see docs/ops.md).
+          npx --yes wrangler@${WRANGLER_VERSION} versions upload 2>&1 | tee upload.log
+          URL=$(grep -oE 'https://[a-z0-9-]+\.[a-z0-9-]+\.workers\.dev' upload.log | head -1)
+          echo "url=$URL" >> "$GITHUB_OUTPUT"
+          echo "Preview URL: $URL"
+      - name: Comment preview URL on PR
+        if: steps.preview.outputs.url != ''
+        uses: actions/github-script@v7
+        env:
+          PREVIEW_URL: ${{ steps.preview.outputs.url }}
+        with:
+          script: |
+            const url = process.env.PREVIEW_URL;
+            const marker = '<!-- antinode-preview -->';
+            const body = `${marker}\n**Antinode preview deployed:** ${url}\n\nEphemeral per-commit Workers version preview — does not affect production.`;
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner, repo: context.repo.repo, issue_number: context.issue.number,
+            });
+            const existing = comments.find((c) => c.body && c.body.includes(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({ owner: context.repo.owner, repo: context.repo.repo, comment_id: existing.id, body });
+            } else {
+              await github.rest.issues.createComment({ owner: context.repo.owner, repo: context.repo.repo, issue_number: context.issue.number, body });
+            }
+      - name: Install Playwright (chromium)
+        run: npx --yes playwright install --with-deps chromium
+      - name: Post-deploy smoke — against preview URL
+        # Non-blocking until playwright.config.ts honours PLAYWRIGHT_BASE_URL (owned by
+        # T10-qa). The config currently hard-codes 127.0.0.1 and boots its own dev server,
+        # so today this would silently test the wrong target. continue-on-error keeps the
+        # pipeline honest (no false green, no hard fail) until that one-line change lands;
+        # flip it off once wired. See docs/ops.md § Post-deploy smoke.
+        continue-on-error: true
+        env:
+          PLAYWRIGHT_BASE_URL: ${{ steps.preview.outputs.url }}
+        run: npx --yes playwright test --project=chromium
+
+  deploy-prod:
+    name: Production deploy (main)
+    needs: [preflight, build]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.preflight.outputs.deploy_ready == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Download dist artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - name: Deploy to production Worker
+        # Third-party action pinned to the v3 release commit SHA (supply-chain hardening).
+        uses: cloudflare/wrangler-action@9acf94ace14e7dc412b076f2c5c20b8ce93c79cd # v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          wranglerVersion: ${{ env.WRANGLER_VERSION }}
+          # No routes in wrangler.jsonc — the custom domain is dashboard-managed and
+          # persists, so this only uploads code + assets (no zone perms needed).
+          command: deploy
+      - name: Install Playwright (chromium)
+        run: npx --yes playwright install --with-deps chromium
+      - name: Post-deploy smoke — against production
+        continue-on-error: true # see note on the preview smoke step
+        env:
+          PLAYWRIGHT_BASE_URL: https://antinode.ponderance.dev
+        run: npx --yes playwright test --project=chromium

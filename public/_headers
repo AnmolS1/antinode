@@ -1,0 +1,42 @@
+# Edge response headers for the Antinode static-assets Worker.
+# Cloudflare Workers static assets read this file natively (same syntax as Pages):
+#   https://developers.cloudflare.com/workers/static-assets/headers/
+# Vite copies public/_headers -> dist/_headers at build; the Worker serves dist/.
+#
+# IMPORTANT — matching semantics: when a request matches MULTIPLE rules, their
+# headers are COMBINED (a repeated header is joined with a comma), they do NOT
+# override. So a bare `Cache-Control: no-store` on `/*` would corrupt the
+# immutable rule on `/assets/*` into `no-store, public, ...`. The `! Cache-Control`
+# detach line strips the inherited value first (no-op if the platform ever switches
+# to most-specific-wins) — keep `/*` above `/assets/*` and `!` first in that block.
+
+/*
+  # No inline scripts (site convention). `blob:` in script-src is REQUIRED, not a
+  # relaxation: realtime-bpm-analyzer loads its AudioWorklet via
+  # URL.createObjectURL(blob) -> audioWorklet.addModule(blobUrl), and AudioWorklet
+  # module loads are governed by script-src in Chromium — without `blob:` the whole
+  # BPM path throws at runtime. It does NOT permit inline script (no 'unsafe-inline').
+  # style-src needs 'unsafe-inline': Tweakpane 4 injects its stylesheet via a runtime
+  # <style> element, and React sets element style="" attributes; neither uses nonces.
+  # connect-src: Spotify PKCE token endpoint (accounts.spotify.com) + Web API
+  # (api.spotify.com). img-src: album art on i.scdn.co/*.scdn.co + data: URIs.
+  # media-src blob:: dropped-file audio via URL.createObjectURL. worker-src blob::
+  # belt-and-suspenders for the worklet under engines that route it via worker-src.
+  # NO COOP/COEP: we don't use SharedArrayBuffer and COEP would demand CORP on
+  # cross-origin Spotify album art (a deliberate trade — see docs/ops.md).
+  Content-Security-Policy: default-src 'self'; script-src 'self' blob:; style-src 'self' 'unsafe-inline'; connect-src 'self' https://api.spotify.com https://accounts.spotify.com; img-src 'self' data: https://i.scdn.co https://*.scdn.co; media-src 'self' blob:; worker-src 'self' blob:; frame-ancestors 'none'; base-uri 'none'; object-src 'none'; form-action 'self'
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  # Allow self for the three capture-ladder features; deny everything else we can name.
+  # autoplay / fullscreen / gamepad are left UNSET (default allowlist = self) so the
+  # canvas fullscreen, audio playback, and MIDI/Gamepad input keep working.
+  Permissions-Policy: microphone=(self), display-capture=(self), midi=(self), camera=(), geolocation=(), payment=(), usb=(), accelerometer=(), gyroscope=(), magnetometer=(), bluetooth=(), serial=(), hid=(), browsing-topics=()
+  # HTML entry (index.html, and every SPA fallback route like /callback) must never
+  # be cached — it references content-hashed asset filenames that change each deploy.
+  Cache-Control: no-store
+
+# Content-hashed build assets (Vite emits dist/assets/*-<hash>.{js,css,map}) are
+# immutable — the filename changes whenever the bytes change, so cache them for a year.
+/assets/*
+  ! Cache-Control
+  Cache-Control: public, max-age=31536000, immutable

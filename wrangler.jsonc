@@ -1,0 +1,37 @@
+// wrangler.jsonc — Cloudflare Workers static-assets deploy for Antinode.
+//
+// Antinode is a plain Vite + React SPA (NO @cloudflare/vite-plugin, NO SSR, no
+// server code). `npm run build` emits a fully static `dist/`; this config uploads
+// that directory as a Workers static-assets deployment. Because there is no
+// `main` (Worker script) and no `binding`, this is an assets-ONLY Worker — the
+// simplest thing that serves a static site on the same Cloudflare account/zone
+// as ponderance.dev.
+//
+// ── Routes / custom domain are intentionally NOT declared here ───────────────
+// The prod hostname `antinode.ponderance.dev` is attached to this Worker ONCE via
+// the Cloudflare dashboard as a *Custom Domain* (owner action — see docs/ops.md).
+// A Custom Domain creates the route + the CNAME in the ponderance.dev zone and
+// PERSISTS across deploys, so CI only ever uploads code+assets and never needs a
+// zone-scoped token. Declaring `routes` here would (a) require zone perms on the
+// deploy token and (b) risk the documented "a named env inherits top-level routes"
+// footgun (a preview upload hijacking the prod domain — see
+// ~/GitHub/ponderance-memory/topics/cloudflare-workers.md). Keep it out.
+//
+// PR previews use `wrangler versions upload` (a unique *-antinode.<sub>.workers.dev
+// preview URL per upload; never shifts prod traffic) — hence `preview_urls: true`.
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "antinode",
+  "compatibility_date": "2026-07-21",
+  "assets": {
+    "directory": "./dist",
+    // SPA fallback: any path that doesn't map to a built asset (e.g. the Spotify
+    // PKCE redirect `/callback`) is served `index.html` with 200 so the client
+    // router can handle it. Header rules in dist/_headers still match on the
+    // *request* path, so /callback gets the HTML no-store rule (see _headers).
+    "not_found_handling": "single-page-application"
+  },
+  // Per-version preview URLs for `wrangler versions upload` (PR previews).
+  "preview_urls": true,
+  "observability": { "enabled": true }
+}
