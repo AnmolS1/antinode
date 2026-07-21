@@ -20,17 +20,16 @@
 - **Sandbox git note:** this environment has no SSH key, so `git push` over SSH fails. Pushes done via `gh auth setup-git` HTTPS helper (`git push https://github.com/AnmolS1/antinode.git …`). The `v0-2023-cra` tag is pushed; the `t01-foundations` branch is **not yet pushed** — push + open PR (or merge to `main`) is the pending owner/next-step decision.
 - Name locked: **Antinode** (see 00-overview for the why + rejected candidates).
 
-## ⚠️ Contract decisions needed BEFORE Wave B (contracts change only at a gate)
+## Contract changes APPLIED at the Wave A gate (owner-approved 2026-07-21)
 
-Two gaps surfaced by Wave A. `src/contracts/` is the frozen inter-task API — deciding these now prevents a mid-wave contract change across Wave B's agents:
-
-1. **AudioContext resume / `EngineFacade.unlock()`** — task text referenced `engine.unlock()` but the contract has no such method. T04 currently treats the `selectSource()` click as the resume point. **Decide:** add `unlock()` to `EngineFacade`, OR make T02's `selectSource()` resume the `AudioContext` (document it as the gesture-unlock). Recommend the latter (fewer contract surface changes).
-2. **Reduced-motion signal for scenes** — 02-design requires a low-motion program; the contract exposes no flag. T04 did the UI half via `matchMedia`; scenes (T06/T09) need an engine-level signal. **Decide:** add `reducedMotion: boolean` to `FrameFeatures` (or a field on `SceneContext`), so scenes read one source of truth instead of each calling `matchMedia`.
+Both applied to `src/contracts/` in commit `5fd6d2c`, producers cascaded, suite still 114-green:
+1. **`EngineFacade.unlock(): Promise<void>`** added. T02's `AudioEngine` already implemented it (and `selectSource()` also resumes the ctx, so no silent-audio bug); the two mock engines got no-op `unlock()`s. UI should call `unlock()` on first gesture.
+2. **`FrameFeatures.reducedMotion: boolean`** added (required). The `AudioEngine` owns it — samples `matchMedia('(prefers-reduced-motion: reduce)')` (guarded for jsdom), subscribes to `change`, stamps it per frame (allocation-free). Scenes (T06/T09) read `frame.reducedMotion` as the single source of truth. UI's own `useReducedMotion` hook (transitions) left as-is.
 
 ## Next up (in order)
 
 1. **Land Wave A on `main`** — push `wave-a` + open PR (or ff-merge). **Blocked on a token-scope owner action:** the gh OAuth token lacks `workflow` scope, so pushing the branch (which adds `.github/workflows/ci.yml`) is rejected, and the sandbox has no SSH key. Owner runs: `gh auth refresh -h github.com -s workflow` then `git push -u origin wave-a && gh pr create --fill --base main`. Landing this also fixes the worktree base bug for Wave B.
-2. **Apply the two contract decisions above** to `src/contracts/` (one deliberate commit, recorded here).
+2. ~~Apply the two contract decisions~~ — **DONE** (commit `5fd6d2c`, see above).
 3. **Wave B in parallel** (T06 heritage scene · T07 params/presets/mod-matrix/MIDI · T08 Spotify PKCE+poller+now-playing · T09 Standing Wave + Phosphor scenes). Spawn worktree-isolated subagents off the (now `main`-merged) base. T07 may add `tweakpane@4`; T08 no deps (PKCE is fetch).
 4. **Wave B gate = wire `main.tsx`** (the deferred integration seam): `import { App } from './ui/App'`; construct the real `EngineFacade` (T02 audio + T03 `createRenderCore({canvas, engine})`); `registerScene(...)` the T06/T09 scenes; `createRoot(uiRoot).render(<App engine={engine}/>)`. Swap `createMockEngine` → real engine here and nowhere else. Recipes: T03 `src/render/dev/harness.ts`, T04 `src/ui/App` (needs exactly one `engine` prop).
 
