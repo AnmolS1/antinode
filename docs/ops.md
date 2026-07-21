@@ -125,15 +125,19 @@ List versions to find the id: `npx wrangler@4.104.0 versions list`.
 ## 3. Post-deploy smoke
 
 `deploy.yml` runs a Playwright chromium smoke against the deploy URL via `PLAYWRIGHT_BASE_URL`
-(boots, WebGL2 fallback path, CSP-violation listener clean, `/callback` serves the SPA).
+(boots, WebGL2 fallback path, CSP-violation listener clean, `/callback` serves the SPA). It is a
+**hard gate** (a failing smoke fails the deploy job).
 
-> **Dependency (T10-qa):** `playwright.config.ts` currently hard-codes
-> `baseURL: 'http://127.0.0.1:5173'` and boots its own dev server, so it ignores
-> `PLAYWRIGHT_BASE_URL` today. Until T10 wires
-> `baseURL: process.env.PLAYWRIGHT_BASE_URL ?? 'http://127.0.0.1:5173'` **and**
-> `webServer: process.env.PLAYWRIGHT_BASE_URL ? undefined : { … }`, the smoke steps are
-> `continue-on-error: true` (no false green, no hard fail). **Flip `continue-on-error` off**
-> in both smoke steps once that change lands.
+`playwright.config.ts` (owned by T10-qa) reads `baseURL: process.env.PLAYWRIGHT_BASE_URL ??
+'http://127.0.0.1:5173'` and auto-omits its local `webServer` when `PLAYWRIGHT_BASE_URL` names a
+non-loopback origin — so the same specs run against the live preview/prod URL without booting a
+dev server or testing the wrong target.
+
+> **Spec scope (why not `--project=chromium` alone):** on GPU-less CI runners WebGL2 resolves to
+> software SwiftShader, where phosphor's shader compile can take ~85s on the first scene switch
+> (`render.spec.ts`). The smoke is therefore scoped to the light specs —
+> `smoke.spec.ts` (boot), `backend.spec.ts`, `determinism.spec.ts` — which cover the smoke goals
+> without that cost. Keep `render.spec.ts` for the full T10 matrix, not the deploy gate.
 
 ## 4. Edge headers (`public/_headers` → `dist/_headers`)
 

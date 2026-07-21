@@ -127,15 +127,15 @@ jobs:
       - name: Install Playwright (chromium)
         run: npx --yes playwright install --with-deps chromium
       - name: Post-deploy smoke — against preview URL
-        # Non-blocking until playwright.config.ts honours PLAYWRIGHT_BASE_URL (owned by
-        # T10-qa). The config currently hard-codes 127.0.0.1 and boots its own dev server,
-        # so today this would silently test the wrong target. continue-on-error keeps the
-        # pipeline honest (no false green, no hard fail) until that one-line change lands;
-        # flip it off once wired. See docs/ops.md § Post-deploy smoke.
-        continue-on-error: true
+        # playwright.config.ts (T10-qa) honours PLAYWRIGHT_BASE_URL and auto-omits its local
+        # webServer for a non-loopback origin, so this runs against the live preview.
+        # Scoped to the light specs: on GPU-less CI runners WebGL2 resolves to SwiftShader
+        # and phosphor's shader compile can take ~85s (the render.spec.ts scene-switch);
+        # boot/backend/determinism cover the smoke goals (boots, WebGL2 fallback, CSP-clean,
+        # /callback serves the SPA) without that cost. This IS a gate now — no continue-on-error.
         env:
           PLAYWRIGHT_BASE_URL: ${{ steps.preview.outputs.url }}
-        run: npx --yes playwright test --project=chromium
+        run: npx --yes playwright test --project=chromium e2e/smoke.spec.ts e2e/backend.spec.ts e2e/determinism.spec.ts
 
   deploy-prod:
     name: Production deploy (main)
