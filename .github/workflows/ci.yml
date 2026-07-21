@@ -32,4 +32,9 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx playwright install --with-deps chromium
-      - run: npm run test:e2e -- --project=chromium
+      # --workers=1: run serially. render.spec's phosphor scene compiles its
+      # feedback/FBM shader in ~85s under CI's software-WebGL2 (SwiftShader),
+      # which is CPU-bound; running parallel workers lets it starve other specs
+      # past their 30s timeout on the 2-core runner. This job only runs on main,
+      # so the serial ~3min cost is fine for a stable gate.
+      - run: npm run test:e2e -- --project=chromium --workers=1
