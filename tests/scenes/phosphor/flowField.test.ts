@@ -78,14 +78,18 @@ describe('simulateTrailValue — the feedback loop is bounded', () => {
     // The shader clamps injection ≤ 8 (injectionBrightness) and decay ≤ CEIL,
     // so the fixed point is ≤ 8/(1-CEIL). Assert we stay under it, always finite.
     const bound = 8 / (1 - DECAY_CEIL) + 1e-6;
+    // 100k property samples, but guard-per-iter instead of 3 expect()/iter
+    // (300k assertions timed out the default 5s on slow CI runners). Same coverage.
     for (let i = 0; i < 100000; i += 1) {
       const decay = decayCoefficient(0.85 + rnd() * 0.14, 0.06, rnd());
       const inject = injectionBrightness(rnd() * 2, rnd() * 4, rnd());
       value = simulateTrailValue(value, decay, inject);
-      expect(Number.isFinite(value)).toBe(true);
-      expect(value).toBeGreaterThanOrEqual(0);
-      expect(value).toBeLessThanOrEqual(bound);
+      if (!Number.isFinite(value) || value < 0 || value > bound) {
+        expect.fail(`diverged at i=${i}: value=${value} (bound=${bound})`);
+      }
     }
+    expect(value).toBeGreaterThanOrEqual(0);
+    expect(value).toBeLessThanOrEqual(bound);
   });
 
   it('converges toward inject/(1-decay) for a steady input', () => {
