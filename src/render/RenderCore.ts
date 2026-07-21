@@ -1,11 +1,13 @@
 import { PerspectiveCamera, Scene } from 'three';
 import type { WebGPURenderer } from 'three/webgpu';
 
-import type { EngineFacade, FrameFeatures, SceneContext, SceneModule } from '../contracts';
+import type { EngineFacade, FrameFeatures, ParamDef, SceneContext, SceneModule } from '../contracts';
 import { FeatureUniforms } from './bridge/FeatureUniforms';
 import { FeedbackHelper } from './feedback/FeedbackHelper';
 import { QualityGovernor } from './governor/QualityGovernor';
 import { FrameLoop } from './loop/FrameLoop';
+import { ModMatrix } from './modmatrix';
+import type { ModRoute } from './modmatrix';
 import { PostChain } from './post/PostChain';
 import { createRenderer, parseBackendPreference } from './renderer/bootstrap';
 import { FadeCompositor } from './scene/FadeCompositor';
@@ -64,8 +66,18 @@ export class RenderCore {
   /** Feedback ping-pong buffer, provided once for scenes/recipes that need it. */
   private feedback!: FeedbackHelper;
 
+  /** Resolved params the active scene consumes (mod-matrix output). Distinct from
+   *  {@link baseParams} — never pass one record as both base and out (self-feed). */
   private readonly params: Record<string, unknown> = {};
+  /** UI-authored base values (pre-modulation), keyed by param key. */
+  private readonly baseParams: Record<string, unknown> = {};
   private readonly outgoingParams: Record<string, unknown> = {};
+
+  /** T07 mod-matrix: resolves (base params, routes, features) → this.params each frame. */
+  private readonly modMatrix = new ModMatrix();
+  /** UI quality pin (scene-facing 0–1); null defers to the governor. */
+  private qualityOverride: number | null = null;
+  private readonly sceneChangeListeners = new Set<(id: string) => void>();
 
   private size: RenderSize = { w: 1, h: 1, dpr: 1 };
   private resizeTimer: ReturnType<typeof setTimeout> | null = null;
@@ -170,6 +182,7 @@ export class RenderCore {
     if (!this.registry.isFading()) this.rebuildPost();
     this.resetSceneParams();
     this.governor.reset();
+    this.emitSceneChange(id);
   }
 
   /** Start the frame loop. */
@@ -218,6 +231,52 @@ export class RenderCore {
     return this.bridge;
   }
 
+  // ---- T07 params / mod-matrix seam (driven by the ParamHost adapter) --------
+
+  /** The active scene's id (`''` before any scene is set). */
+  activeSceneId(): string {
+    return this.registry.activeSceneId() ?? '';
+  }
+
+  /** The active scene's parameter definitions (drives the params pane). */
+  activeParamDefs(): readonly ParamDef[] {
+    return this.registry.activeScene()?.params ?? [];
+  }
+
+  /** Read a base (pre-modulation) param value. */
+  getBaseParam(key: string): unknown {
+    return this.baseParams[key];
+  }
+
+  /** Write a base param; the mod-matrix applies it on the next frame. */
+  setBaseParam(key: string, value: unknown): void {
+    this.baseParams[key] = value;
+  }
+
+  /** Reconfigure the mod-matrix for a scene + its routes. Allocates — off the hot path. */
+  setRoutes(defs: readonly ParamDef[], routesByKey: ReadonlyMap<string, readonly ModRoute[]>): void {
+    this.modMatrix.configure(defs, routesByKey);
+  }
+
+  /** The live resolved value of a param (for the pane's preview meters). */
+  resolvedParam(key: string): number {
+    const v = this.params[key];
+    return typeof v === 'number' ? v : 0;
+  }
+
+  /** Pin the scene-facing quality (0–1), or `null` to defer to the governor. */
+  setQualityOverride(quality: number | null): void {
+    this.qualityOverride = quality;
+  }
+
+  /** Subscribe to active-scene changes; returns an unsubscribe fn. */
+  onSceneChange(cb: (id: string) => void): () => void {
+    this.sceneChangeListeners.add(cb);
+    return () => {
+      this.sceneChangeListeners.delete(cb);
+    };
+  }
+
   /** Tear everything down. */
   dispose(): void {
     this.loop.stop();
@@ -257,7 +316,14 @@ export class RenderCore {
 
     const active = this.registry.activeScene();
     if (active) {
-      this.params['quality'] = this.governor.level.sceneQuality;
+      // Resolve base params + mod routes into this.params (out ≠ base — the two
+      // records are distinct, so a modulated param can never self-feed).
+      this.modMatrix.apply(this.params, this.baseParams, f, dtSec);
+      // The governor writes the scene-facing quality every frame; a UI override
+      // is applied AFTER so it still wins (T07 quality-reconcile seam). Note the
+      // override pins only params['quality'] — DPR/renderScale stay governor-owned
+      // (there is no governor level-pin API; adding one exceeds this gate's scope).
+      this.params['quality'] = this.qualityOverride ?? this.governor.level.sceneQuality;
       active.update(f, this.params, dtSec);
     }
     const outgoing = this.registry.outgoingScene();
@@ -301,11 +367,23 @@ export class RenderCore {
 
   private resetSceneParams(): void {
     for (const key of Object.keys(this.params)) delete this.params[key];
+    for (const key of Object.keys(this.baseParams)) delete this.baseParams[key];
     const active = this.registry.activeScene();
-    if (!active) return;
+    if (!active) {
+      this.modMatrix.configure([], new Map());
+      return;
+    }
     for (const p of active.params) {
       this.params[p.key] = p.default;
+      this.baseParams[p.key] = p.default;
     }
+    // Reconfigure for the new scene with no routes; the ParamHost re-applies the
+    // scene's default routes in its onSceneChange handler (off the hot path).
+    this.modMatrix.configure(active.params, new Map());
+  }
+
+  private emitSceneChange(id: string): void {
+    for (const cb of this.sceneChangeListeners) cb(id);
   }
 
   private measureSize(): void {
