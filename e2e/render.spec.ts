@@ -22,7 +22,9 @@ test.describe('render + live interaction', () => {
     // on first switch — heritage/standing-wave are sub-second, and phosphor is
     // instant on a real GPU. All three DO render; this cost is a software-render
     // artifact, not an app issue. See docs/qa/README.md.
-    test.setTimeout(200_000);
+    // CI's 2-core SwiftShader ran ~210s (killed at 200s); give phosphor's ~85s
+    // compile + the two other scenes + reach-live generous headroom on CI.
+    test.setTimeout(process.env.CI ? 420_000 : 200_000);
     await reachLiveWithFile(page);
     // Default scene highlighted correctly (registration order → standing-wave).
     await expect(

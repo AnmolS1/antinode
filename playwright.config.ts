@@ -29,6 +29,11 @@ export default defineConfig({
   testDir: './e2e',
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
+  // CI runs on a 2-core runner with software-WebGL2 (SwiftShader) — reaching the
+  // `live` phase (first scene render) + axe scans run ~3-5x slower than local GPU.
+  // Bump the per-test budget so slow-but-working tests don't false-fail at the 30s
+  // default (render.spec sets its own larger budget via test.setTimeout).
+  timeout: process.env.CI ? 90_000 : 30_000,
   retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI ? [['github'], ['list']] : 'list',
   // The soak spec self-gates on process.env.SOAK; per-PR runs never touch it.
