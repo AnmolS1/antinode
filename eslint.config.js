@@ -13,6 +13,8 @@ export default tseslint.config(
       'playwright-report',
       'test-results',
       '.remember',
+      '.claude', // agent worktrees / local harness state — never our source
+      'touchdesigner', // look-dev + TSL porting reference; not part of the app build (outside tsconfig)
     ],
   },
   js.configs.recommended,
