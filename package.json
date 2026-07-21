@@ -19,7 +19,8 @@
   "dependencies": {
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
-    "realtime-bpm-analyzer": "^5.0.15"
+    "realtime-bpm-analyzer": "^5.0.15",
+    "three": "^0.185.1"
   },
   "devDependencies": {
     "@eslint/js": "^9.0.0",
@@ -28,6 +29,7 @@
     "@types/node": "^24.0.0",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
+    "@types/three": "^0.185.1",
     "@vitejs/plugin-react": "^5.2.0",
     "eslint": "^9.0.0",
     "eslint-plugin-react-hooks": "^7.0.0",
