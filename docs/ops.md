@@ -71,6 +71,14 @@ PR preview URLs are `*-antinode.<subdomain>.workers.dev`. Ensure the account's w
 subdomain is enabled (dashboard → **Workers & Pages → Subdomain**) — required once for
 `versions upload` preview URLs to resolve. `preview_urls: true` in `wrangler.jsonc` opts the Worker in.
 
+### 0f. Branch protection — "prod deploy only after CI green"
+
+`deploy.yml`'s `deploy-prod` job fires on every push to `main` and re-runs its own build, but it
+does **not** gate on `ci.yml` (lint/unit/e2e). To guarantee production only ever ships CI-green
+commits, protect `main`: GitHub → **Settings → Branches → Add branch ruleset** for `main` →
+require a pull request + **require status checks to pass** → select the `ci.yml` jobs. Merged
+commits are then already CI-green before `deploy-prod` runs.
+
 ---
 
 ## 1. Deploy pipelines (`.github/workflows/deploy.yml`)
@@ -132,8 +140,13 @@ List versions to find the id: `npx wrangler@4.104.0 versions list`.
 Verify after deploy — evidence for launch acceptance:
 
 ```sh
-curl -sSI https://antinode.ponderance.dev            # HTML: expect Cache-Control: no-store + all security headers
-curl -sSI https://antinode.ponderance.dev/assets/    # hashed asset: expect Cache-Control: public, max-age=31536000, immutable
+# HTML — expect Cache-Control: no-store + all security headers:
+curl -sSI https://antinode.ponderance.dev
+# A real content-hashed asset — expect Cache-Control: public, max-age=31536000, immutable.
+# Use an actual filename from dist/assets/ (e.g. three-<hash>.js); a bare /assets/ path
+# hits the SPA fallback and returns index.html with no-store, NOT the immutable rule:
+ASSET=$(basename "$(ls dist/assets/three-*.js | head -1)")
+curl -sSI "https://antinode.ponderance.dev/assets/$ASSET"
 ```
 
 Expected on the HTML response:
