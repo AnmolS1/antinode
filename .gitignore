@@ -26,8 +26,9 @@ coverage
 .DS_Store
 *.swp
 
-# Claude local memory buffer (kept local, not shared)
+# Claude local memory buffer + agent worktrees (kept local, not shared)
 .remember/
+.claude/
 
 # logs
 npm-debug.log*
