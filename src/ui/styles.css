@@ -636,7 +636,9 @@ kbd {
   justify-content: center;
 }
 .footer__note {
-  color: var(--ink-40);
+  /* --ink-60 (not --ink-40): 0.4-alpha composited to #666e72 on the dark ground
+     = 3.38:1, below AA 4.5:1 for 12px. --ink-60 composites to ~5.9:1. (T10 a11y) */
+  color: var(--ink-60);
   font-size: 0.75rem;
 }
 

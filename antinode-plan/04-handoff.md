@@ -2,7 +2,15 @@
 
 **Read this first when resuming work.** Then `00-overview.md` (decisions + constraints), then `01-task-graph.md` (how to execute), then your task file in `tasks/`.
 
-## State as of 2026-07-21 (Wave B complete — on branch `wave-b`)
+## State as of 2026-07-21 (Wave C automated slice complete — on branch `wave-c`)
+
+- **WAVE C (automated slice) DONE** on `wave-c` (off `main`): **T10 QA automation** + **T11 deploy config**, both merged + a gate a11y fix. Suite: typecheck+lint clean, 302 unit tests, build (app 453 kB / three 873 kB after bundle split). **Playwright matrix runs GREEN across chromium/firefox/webkit (52 passed, 0 failed) — all 3 scenes verified rendering NON-BLACK in headless software-WebGL2** (the first real render proof). Per-task: T10 `5cfa46f`, T11 `a8555a0`.
+  - **T10** (`e2e/**`, `docs/qa/**`, `playwright.config.ts`, `@axe-core/playwright`): per-scene non-black render, param/preset/fade/snapshot, backend axis (`?gl=1`/`?gpu=0` invariant — SwiftShader means both resolve to webgl2 locally; WebGPU-primary needs a GPU runner), axe (0 serious/critical), keyboard-only, reduced-motion, flashGuard (2.5/s ≤3), cross-engine `FrameFeatures` determinism (<2e-4), soak self-gated on `SOAK=1`. Manual checklists in `docs/qa/` for Waterfox/Safari/iOS/Spotify. Env facts: phosphor shader compiles ~85 s on first switch under SwiftShader (instant on GPU).
+  - **T11** (`wrangler.jsonc`, `public/_headers`, `.github/workflows/deploy.yml`, `docs/ops.md`, `vite.config.ts` split): Cloudflare **Workers static assets** (no server code), full CSP/Permissions-Policy at the edge, preview-per-PR + prod-on-main workflow **guarded to skip without `CLOUDFLARE_API_TOKEN`**, post-deploy Playwright smoke (light specs) as a hard gate. Load-bearing CSP: `script-src 'self' blob:` (realtime-bpm-analyzer worklet) + `style-src 'unsafe-inline'` (Tweakpane).
+  - **Gate a11y fix (`—`):** `.footer__note` `--ink-40`→`--ink-60` (3.38:1 → ~5.9:1 AA); T10's axe quarantine removed (verified: chromium a11y+smoke e2e 7/7 green with the footer node scanned).
+  - **✅ PREVIEW DEPLOYED (live):** **https://antinode.discoinferno.workers.dev** — GET `/` → 200 with the full CSP + security headers, SPA `/callback` fallback works, hashed assets immutable-1y. This is the `*.workers.dev` staging URL; **production `antinode.ponderance.dev` is untouched** (no custom domain attached — deliberate, owner step). Deploy done via your `wrangler login` OAuth (account `…097a35`).
+
+## State as of 2026-07-21 (Wave B complete — merged to `main`)
 
 - **WAVE B DONE** on branch `wave-b` (off `main`). All 5 tasks (T06 heritage · T07 params/MIDI · T08 Spotify · T09a standing-wave · T09b phosphor) built by parallel worktree agents, merged disjoint (only seam: T07's `tweakpane` dep), then **wired into a running app** at the gate. **Integrated suite green (verified by me):** typecheck + lint clean, **302 tests / 41 files**, `build` OK, `npm run dev` boots → HTTP 200 with the real engine/renderer/scenes bundled (main chunk 1.33 MB — a T11 code-split candidate; three.js dominates). Per-task commits: T06 `7868ff2`, T07 `610b576`, T08 `fb3a802`, T09a `9f7d92b`, T09b `140f7c7`; gate wiring `1fc6a0b`.
   - **Gate wiring (`1fc6a0b`):** `main.tsx` rewritten — real boot (AudioEngine + RenderCore via a `SceneBridge` closure-holder resolving the engine↔core cycle; registers all 3 scenes, default `standing-wave`; mounts `<App engine>`). `RenderCore.ts` — added `baseParams` (UI input) distinct from resolved `params` (scene output) + `ModMatrix.apply(out,base,f,dt)` each frame before `scene.update` (no self-feed), quality-override reconcile after governor, new seam methods. New `src/ui/params/renderParamHost.ts` (real `ParamHost` over RenderCore). `App.tsx` — mounts `<ParamsPane>`, real `useSpotify()`→`<SpotifyArea>`, keyboard `[`/`]`/`R` + hash-preset, `engine.unlock()` on gesture. Old `src/App.tsx` placeholder untouched (still under `tests/app.test.tsx`).
@@ -34,18 +42,18 @@ Both applied to `src/contracts/` in commit `5fd6d2c`, producers cascaded, suite 
 
 ## Next up (in order)
 
-1. **Land Wave B on `main`** — `wave-b` → PR → merge (autonomous per owner: "if everything's green you don't have to wait"). Watch the `e2e` job that fires on the `main` merge (first browser run of the *wired* app; the boot `catch` mounts a degraded shell so the smoke's "Antinode" heading survives even without WebGL in CI).
-2. **Wave C** (the final wave):
-   - **T10 QA matrix** — the whole-app gate nothing ships around: Playwright across chromium/firefox/webkit + Waterfox/iOS manual, axe a11y, GPU/pixel/leak-baseline, `?gl=1`/`?gpu=0` paths, flash-safety, reduced-motion. This is where all the "unverified headless" items finally get verified. Depends on T06–T09 (done).
-   - **T11 deploy** — Cloudflare static at `antinode.ponderance.dev`, headers/CSP, DNS, launch mechanics, bundle code-split (the 1.33 MB chunk). Wrangler already logged in (owner ran `wrangler login`).
-   - **T12 legal/site/launch** — flip ponderance `legal-services.ts` status `planned`→`live`, verify `/privacy` `/terms`, workshop entry + marginalia note; needs T08 shipped + launch timing.
-3. **Owner actions still pending:** set `VITE_SPOTIFY_CLIENT_ID` in `.env.local`; allowlist the 5 Spotify seats + keep owner on Premium; commit the ponderance `legal-services.ts` + shared-memory edits with their next respective deploys.
+1. **Land Wave C on `main`** — `wave-c` → PR → merge. CI `build`+`e2e` run on the merge (the e2e job now runs T10's full chromium matrix — slower ~2-4 min due to phosphor's SwiftShader compile, but green locally). `deploy.yml` is guarded → no auto-prod-deploy without the CF token.
+2. **Look at the preview** — https://antinode.discoinferno.workers.dev — open it in a real browser (Chrome/Firefox/Waterfox/Safari) and watch the scenes actually render on your GPU. This is the visual review the headless suite can't do.
+3. **T10 manual QA** (owner, real devices — `docs/qa/checklist-*.md`): Waterfox (daily driver, first-class), macOS Safari 26, iOS Safari (iPhone+iPad), Chrome tab-capture against a real Spotify tab, the Spotify layer on an allowlisted account. Fill `docs/qa/report-<date>.md`; write the go/no-go verdict. The **heritage A/B perceptual regression** vs the 2023 app (tag `v0-2023-cra`) is human-gated here.
+4. **T11 production** (owner + me): set repo secrets `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID` and Variable `VITE_SPOTIFY_CLIENT_ID`; attach `antinode.ponderance.dev` as a Custom Domain on the Worker (dashboard → auto CNAME+cert); then the `main` deploy pipeline goes live. Full steps in `docs/ops.md`.
+5. **T12 launch** — flip ponderance `legal-services.ts` `planned`→`live`, verify `/privacy` `/terms`, workshop entry + marginalia note; coordinate same-day with the prod deploy.
+6. **Other owner actions:** set `VITE_SPOTIFY_CLIENT_ID` in local `.env.local` (dev) + repo Variable (CI); allowlist the 5 Spotify seats + owner stays Premium; commit the ponderance `legal-services.ts` + shared-memory edits with their next deploys.
 
-### Deferred/known-open carried into Wave C (not blockers)
-- **All GPU/browser verification is still pending** — the scenes have never rendered; T10 is where that happens. Heritage A/B perceptual regression is human-gated in review.
-- Dev harnesses (`src/render/dev/dev.html`, T04 mock) exist but aren't the main entry. `/dev/audio.html` live-meter page NOT built (needs a UI/dev owner).
-- **Gate deferrals (Wave B):** palette-follow + metadata-procedural BPM link (see Wave B state above). **Contract-friction candidates:** `heritage.bloomSend` routing + async `setScene` (see above) — address at a future gate if they bite.
-- axe + full Playwright matrix + GPU/pixel/leak-baseline = **T10**. Bundle code-split = **T11**.
+### Deferred/known-open (not blockers)
+- **WebGPU-primary path** unverified (local/CI SwiftShader resolves to WebGL2) — needs a real-GPU browser; that's the preview-URL + manual QA.
+- **Gate deferrals (Wave B):** palette-follow + metadata-procedural BPM link. **Contract-friction candidates:** `heritage.bloomSend` routing + async `setScene` — address at a future gate if they bite.
+- Dev harnesses (`src/render/dev/dev.html`, T04 mock) aren't the main entry; `/dev/audio.html` live-meter page not built.
+- CI actions: bump `actions/*@v4`→`@v5` to clear the Node-20 deprecation warning. Preview deploy ships source maps (fine for staging; consider stripping for prod).
 
 ## Standing decisions log
 
