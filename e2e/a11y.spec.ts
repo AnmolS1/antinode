@@ -7,19 +7,10 @@
  *   • prefers-reduced-motion emulation engages the low-motion program.
  *   • flashGuard re-verified E2E: the engine's onset rate over a strobe-bait
  *     fixture stays ≤ 3/s (WCAG 2.3.1), the surface that drives every strobe.
- *
- * KNOWN QUARANTINED FINDING (filed for T04 — see docs/qa/report-template.md):
- *   `.footer__note` ("antinode · a ponderance project") is #666e72 on #0e1a24 =
- *   3.38:1, below WCAG AA 4.5:1 for 12px text. It is real but low-severity
- *   (decorative footer). We exclude ONLY that node from the contrast scan so a
- *   NEW serious violation still fails the gate, and track it as an open P2. When
- *   T04 fixes the token, delete the exclusion.
  */
 import { test, expect } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import { reachLiveWithFile, STROBE_WAV, TONE_WAV, wavBase64, analyzeFixture } from './helpers';
-
-const QUARANTINE_FOOTER_NOTE = '.footer__note'; // open P2 contrast finding (T04)
 
 function seriousOrCritical(results: { violations: { impact?: string | null; id: string; nodes: unknown[] }[] }) {
   return results.violations.filter((v) => v.impact === 'serious' || v.impact === 'critical');
@@ -29,7 +20,7 @@ test.describe('axe — no serious/critical violations', () => {
   test('source picker (onboarding)', async ({ page }) => {
     await page.goto('/');
     await expect(page.getByRole('heading', { name: 'Antinode' })).toBeVisible();
-    const results = await new AxeBuilder({ page }).exclude(QUARANTINE_FOOTER_NOTE).analyze();
+    const results = await new AxeBuilder({ page }).analyze();
     expect(seriousOrCritical(results)).toEqual([]);
   });
 
@@ -37,10 +28,9 @@ test.describe('axe — no serious/critical violations', () => {
     await reachLiveWithFile(page);
     await page.waitForTimeout(500);
     // Tweakpane (.params-pane) is a third-party widget we do not own; excluded per
-    // task guidance. The footer note is the quarantined P2 above.
+    // task guidance.
     const results = await new AxeBuilder({ page })
       .exclude('.params-pane')
-      .exclude(QUARANTINE_FOOTER_NOTE)
       .analyze();
     expect(seriousOrCritical(results)).toEqual([]);
   });
@@ -53,7 +43,6 @@ test.describe('axe — no serious/critical violations', () => {
     await expect(page.getByRole('dialog')).toBeVisible();
     const results = await new AxeBuilder({ page })
       .exclude('.params-pane')
-      .exclude(QUARANTINE_FOOTER_NOTE)
       .analyze();
     expect(seriousOrCritical(results)).toEqual([]);
   });
