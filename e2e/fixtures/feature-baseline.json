@@ -1,0 +1,14 @@
+{
+  "_comment": "Feature-determinism baseline for tone.wav, captured from headless Chromium on 2026-07-21 (T10). The Analyzer is pure JS DSP (no GPU), so it is deterministic within an engine and near-identical across engines: the observed spread across chromium/firefox/webkit was < 2e-4 (only decodeAudioData differs slightly). Tolerances below are deliberately generous relative to that spread. Regenerate by logging analyzeFixture(tone) if the analysis pipeline intentionally changes.",
+  "fixture": "tone.wav",
+  "frames": 118,
+  "onsets": 1,
+  "meanRms": 0.39588,
+  "meanLoudNorm": 0.94832,
+  "meanBands": { "bass": 0.99785, "lowMid": 1.0, "mid": 0.98178, "high": 0.99725 },
+  "tolerances": {
+    "meanAbs": 0.02,
+    "framesAbs": 2,
+    "onsetsAbs": 1
+  }
+}
