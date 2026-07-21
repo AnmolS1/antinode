@@ -47,6 +47,7 @@ export function synthFeatures(tSec: number, out?: FrameFeatures): FrameFeatures 
     onset,
     beat: { bpm, phase: beatPos, confidence: 0.8 },
     silent: false,
+    reducedMotion: false,
   };
   return frame;
 }
@@ -73,6 +74,10 @@ export class MockEngine implements EngineFacade {
 
   async selectSource(): Promise<void> {
     // No real sources in the fixture.
+  }
+
+  async unlock(): Promise<void> {
+    // No-op: the fixture has no AudioContext to resume.
   }
 
   latest(): FrameFeatures {

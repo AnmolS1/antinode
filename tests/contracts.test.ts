@@ -16,6 +16,7 @@ describe('contracts', () => {
       onset: false,
       beat: { bpm: null, phase: 0, confidence: 0 },
       silent: true,
+      reducedMotion: false,
     };
 
     expect(f.spectrum).toHaveLength(64);

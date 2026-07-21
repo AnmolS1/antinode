@@ -51,4 +51,5 @@ export interface FrameFeatures {
   beat: BeatInfo;
   /** True when input has been sustained sub-threshold while a source is active. */
   silent: boolean; // silence: sustained sub-threshold input while a source is active
+  reducedMotion: boolean; // engine-owned: user prefers reduced motion (prefers-reduced-motion). Scenes read this as the single source of truth instead of calling matchMedia themselves.
 }

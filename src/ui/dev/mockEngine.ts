@@ -41,6 +41,7 @@ export function idleFrame(overrides: Partial<FrameFeatures> = {}): FrameFeatures
     onset: false,
     beat: { bpm: null, phase: 0, confidence: 0 },
     silent: true,
+    reducedMotion: false,
     ...overrides,
   };
 }
@@ -61,6 +62,7 @@ export function signalFrame(t: number): FrameFeatures {
     onset: t % 0.5 < 0.02,
     beat: { bpm: 120, phase: (t % 0.5) * 2, confidence: 0.8 },
     silent: false,
+    reducedMotion: false,
   };
 }
 
@@ -134,6 +136,7 @@ export function createMockEngine(
       // A real engine resumes its AudioContext on this user-gesture call.
       await Promise.resolve();
     },
+    unlock: () => Promise.resolve(),
     latest: () => last,
     onFrame: (cb) => {
       subscribers.add(cb);

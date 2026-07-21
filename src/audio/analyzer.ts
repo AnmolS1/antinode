@@ -109,6 +109,7 @@ export class Analyzer {
       onset: false,
       beat,
       silent: false,
+      reducedMotion: false, // engine-owned; the engine stamps the real value on emit.
     };
   }
 

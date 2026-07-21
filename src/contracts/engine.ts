@@ -22,6 +22,10 @@ export interface EngineFacade {
    * @returns an unsubscribe function.
    */
   onFrame(cb: (f: FrameFeatures) => void): () => void;
+  /** Resume the (gesture-suspended) AudioContext. Call from a user gesture (e.g. first
+   *  source selection or an explicit "enable audio" click). Safe to call repeatedly;
+   *  a no-op once running. `selectSource()` also resumes as a fallback. */
+  unlock(): Promise<void>;
   /** Switch the active scene by its {@link import('./scene').SceneModule.id}. */
   setScene(id: string): void;
   /** List the registered scenes as `{ id, name }`. */

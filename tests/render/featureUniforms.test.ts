@@ -18,6 +18,7 @@ function frame(overrides: Partial<FrameFeatures> = {}): FrameFeatures {
     onset: true,
     beat: { bpm: 128, phase: 0.5, confidence: 0.75 },
     silent: false,
+    reducedMotion: false,
     ...overrides,
   };
 }

@@ -45,6 +45,7 @@ function emptyFrame(): FrameFeatures {
     onset: false,
     beat,
     silent: false,
+    reducedMotion: false,
   };
 }
 
@@ -83,11 +84,27 @@ export class AudioEngine implements EngineFacade {
     }
   };
 
+  // Engine-owned reduced-motion signal, sampled from prefers-reduced-motion and
+  // stamped onto every emitted frame. Sampled into a stored field (no per-frame
+  // matchMedia in the hot path); defaults false where matchMedia is absent (tests).
+  private reducedMotion = false;
+  private motionQuery: MediaQueryList | null = null;
+  private readonly onReducedMotionChange = (e: MediaQueryListEvent): void => {
+    this.reducedMotion = e.matches;
+  };
+
   constructor(opts: EngineOptions = {}) {
     this.contextFactory = opts.contextFactory ?? ((): AudioContext => new AudioContext());
     this.bridge = opts.sceneBridge ?? { setScene: () => {}, scenes: () => [] };
     this.fftSize = opts.fftSize ?? 2048;
     this.timeBuf = new Float32Array(this.fftSize);
+
+    if (typeof window !== 'undefined' && typeof window.matchMedia === 'function') {
+      const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
+      this.reducedMotion = mq.matches;
+      mq.addEventListener('change', this.onReducedMotionChange);
+      this.motionQuery = mq;
+    }
   }
 
   // ---- EngineFacade ----
@@ -173,6 +190,8 @@ export class AudioEngine implements EngineFacade {
     if (typeof window !== 'undefined') {
       window.removeEventListener('focus', this.onVisibility);
     }
+    this.motionQuery?.removeEventListener('change', this.onReducedMotionChange);
+    this.motionQuery = null;
     if (this.ctx && this.ctx.state !== 'closed') await this.ctx.close();
     this.ctx = null;
     this.analyser = null;
@@ -275,6 +294,8 @@ export class AudioEngine implements EngineFacade {
       this.frame = this.analyzer.analyze(this.timeBuf, t);
     }
 
+    // Stamp the engine-owned reduced-motion signal onto whichever frame we emit.
+    this.frame.reducedMotion = this.reducedMotion;
     for (const cb of this.subscribers) cb(this.frame);
     return this.frame;
   }
