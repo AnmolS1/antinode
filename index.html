@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <title>Antinode — it listens, and gives the sound a shape</title>
+    <meta
+      name="description"
+      content="A music visualizer that listens to real audio and gives the sound a shape."
+    />
+  </head>
+  <body>
+    <!-- The engine (T02/T03) owns this canvas; React (T04) owns #ui-root beside it. -->
+    <canvas id="stage" aria-hidden="true"></canvas>
+    <div id="ui-root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

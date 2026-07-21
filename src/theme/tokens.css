@@ -1,0 +1,83 @@
+/* Design tokens (T01). Dark-first: :root holds the dark defaults; the
+   [data-theme="light"] block overrides for light. Extended per 02-design.md. */
+
+:root {
+  --color-graph: #0e1a24;
+  --color-card: #182530;
+  --color-grid: rgba(130, 169, 206, 0.07);
+  --color-graphite: #e9ece7;
+  --color-crease: #82a9ce;
+  --color-phosphor: #4ade80;
+  --color-phosphor-deep: #1e8a52;
+  --color-canvas-bg: #050a0f;
+
+  --font-display: 'Bricolage Grotesque', system-ui, sans-serif;
+  --font-body: 'Hanken Grotesk', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+}
+
+:root[data-theme='light'] {
+  --color-graph: #eef0ec;
+  --color-card: #f6f7f4;
+  --color-grid: rgba(46, 94, 140, 0.07);
+  --color-graphite: #1b2a33;
+  --color-crease: #2e5e8c;
+  --color-phosphor: #2fbf71;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  background: var(--color-graph);
+  color: var(--color-graphite);
+  font-family: var(--font-body);
+}
+
+#stage {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  background: var(--color-canvas-bg);
+  z-index: 0;
+}
+
+#ui-root {
+  position: relative;
+  z-index: 1;
+}
+
+.landing {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 100vh;
+  padding: 2rem;
+  text-align: center;
+}
+
+.wordmark {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(2.5rem, 8vw, 5rem);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--color-phosphor);
+}
+
+.tagline {
+  margin: 0;
+  font-size: clamp(1rem, 3vw, 1.35rem);
+  color: var(--color-graphite);
+}
+
+.scaffold-note {
+  margin: 1.5rem 0 0;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  opacity: 0.55;
+}
