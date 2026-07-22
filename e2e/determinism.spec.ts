@@ -16,6 +16,21 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { TONE_WAV, wavBase64, analyzeFixture } from './helpers';
 
+// `analyzeFixture` runtime-imports `/src/audio/analyzer.ts`, which the Vite dev
+// server transforms and serves but a deployed build does not expose (it is
+// bundled + hashed). So this spec is meaningful only against the local dev
+// server (the local/CI e2e matrix), NOT the post-deploy smoke — where the import
+// 404s to the SPA fallback and "Failed to fetch dynamically imported module".
+// The determinism it pins is pure GPU-independent DSP, so a deploy smoke has no
+// reason to re-check it. Skip when pointed at a non-loopback (deployed) origin.
+const LOOPBACK = /(^|\/\/)(127\.0\.0\.1|localhost)(:|\/|$)/;
+test.beforeEach(({ baseURL }) => {
+  test.skip(
+    !!baseURL && !LOOPBACK.test(baseURL),
+    'determinism uses analyzeFixture (imports dev-server-served /src modules); local dev / CI only, not the deploy smoke',
+  );
+});
+
 const baseline = JSON.parse(
   readFileSync(fileURLToPath(new URL('./fixtures/feature-baseline.json', import.meta.url)), 'utf8'),
 ) as {
