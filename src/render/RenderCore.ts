@@ -2,6 +2,7 @@ import { PerspectiveCamera, Scene } from 'three';
 import type { WebGPURenderer } from 'three/webgpu';
 
 import type { EngineFacade, FrameFeatures, ParamDef, SceneContext, SceneModule } from '../contracts';
+import { CAMERA_BASELINE, resetCameraToBaseline } from './camera';
 import { FeatureUniforms } from './bridge/FeatureUniforms';
 import { FeedbackHelper } from './feedback/FeedbackHelper';
 import { QualityGovernor } from './governor/QualityGovernor';
@@ -100,8 +101,8 @@ export class RenderCore {
     this.maxDpr = opts.maxDpr ?? DEFAULT_MAX_DPR;
     this.hooks = opts;
 
-    this.camera = new PerspectiveCamera(60, 1, 0.1, 100);
-    this.camera.position.z = 5;
+    this.camera = new PerspectiveCamera(CAMERA_BASELINE.fov, 1, CAMERA_BASELINE.near, CAMERA_BASELINE.far);
+    this.resetCamera();
 
     this.registry = new SceneRegistry({ onSwapComplete: () => this.onSwapComplete() });
     this.loop = new FrameLoop((dt) => this.tick(dt));
@@ -164,6 +165,16 @@ export class RenderCore {
    */
   async setScene(id: string): Promise<void> {
     if (id === this.registry.activeSceneId()) return;
+
+    // Reset the shared camera to its canonical baseline BEFORE the incoming
+    // scene initializes. Scenes render through one shared camera (RenderCore owns
+    // it); a scene that reframes it (Heritage sets the 2023 fov/position to frame
+    // its radius-40 sphere) must not leave that framing behind for the next
+    // scene. Standing Wave / Phosphor assume the baseline and never touch the
+    // camera, so without this reset they inherit Heritage's framing and their
+    // origin-centred geometry projects to a speck off-screen (looks "black").
+    // The incoming scene's `init` may override this baseline (Heritage does).
+    this.resetCamera();
 
     const incomingThree = new Scene();
     const module = this.registry.get(id);
@@ -293,6 +304,11 @@ export class RenderCore {
   }
 
   // ---- internals -------------------------------------------------------------
+
+  /** Restore the shared camera to its canonical baseline (see {@link resetCameraToBaseline}). */
+  private resetCamera(): void {
+    resetCameraToBaseline(this.camera);
+  }
 
   private buildContext(three: Scene): SceneContext {
     return {
@@ -449,6 +465,10 @@ export class RenderCore {
     module.dispose();
     const fresh = new Scene();
     this.threeByScene.set(module, fresh);
+    // A scene may reframe the shared camera in init (Heritage); reset to baseline
+    // first so a context-loss reinit starts from the same canonical state a fresh
+    // activation would (the scene re-applies its own framing if it needs one).
+    this.resetCamera();
     await module.init(this.buildContext(fresh));
     this.activeThree = fresh;
     this.rebuildPost();
