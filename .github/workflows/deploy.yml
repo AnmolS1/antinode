@@ -1,7 +1,7 @@
 name: Deploy (Cloudflare)
 
 # PR  → ephemeral per-commit preview (Workers `versions upload`, URL commented on the PR).
-# main → production deploy to the `antinode` Worker (custom domain antinode.ponderance.dev,
+# prod → production deploy to the `antinode` Worker (custom domain antinode.ponderance.dev,
 #        attached once via the Cloudflare dashboard — see docs/ops.md).
 #
 # This workflow is intentionally self-contained: the full lint/unit/e2e matrix lives in
@@ -14,7 +14,7 @@ name: Deploy (Cloudflare)
 on:
   pull_request:
   push:
-    branches: [main]
+    branches: [prod]
   workflow_dispatch:
 
 concurrency:
@@ -138,9 +138,9 @@ jobs:
         run: npx --yes playwright test --project=chromium e2e/smoke.spec.ts e2e/backend.spec.ts e2e/determinism.spec.ts
 
   deploy-prod:
-    name: Production deploy (main)
+    name: Production deploy (prod)
     needs: [preflight, build]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.preflight.outputs.deploy_ready == 'true'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/prod' && needs.preflight.outputs.deploy_ready == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

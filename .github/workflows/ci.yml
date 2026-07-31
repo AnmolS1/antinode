@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [prod]
   pull_request:
 
 jobs:
@@ -22,7 +22,7 @@ jobs:
 
   e2e:
     needs: build
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/prod'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -35,6 +35,6 @@ jobs:
       # --workers=1: run serially. render.spec's phosphor scene compiles its
       # feedback/FBM shader in ~85s under CI's software-WebGL2 (SwiftShader),
       # which is CPU-bound; running parallel workers lets it starve other specs
-      # past their 30s timeout on the 2-core runner. This job only runs on main,
+      # past their 30s timeout on the 2-core runner. This job only runs on prod,
       # so the serial ~3min cost is fine for a stable gate.
       - run: npm run test:e2e -- --project=chromium --workers=1
