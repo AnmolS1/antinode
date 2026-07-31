@@ -197,6 +197,11 @@ dev. The Spotify dashboard dev redirect URI must be exactly `http://127.0.0.1:51
    (+ dev `http://127.0.0.1:5173/callback`); allowlist filled (5 seats); owner account has Premium active; PKCE only (no client secret in use).
 4. **Deploy prod** (`main` push or manual `wrangler deploy`), then **run smoke** + the header `curl -I` checks (§3, §4).
 5. **Hand to T12** — registry flip (`status: 'live'` in ponderance `legal-services.ts`) + site content; coordinate same-day.
+   **Add the `SUPPORT` entry in the same commit** (ponderance `src/data/support.ts`). Antinode is
+   deliberately absent from `SUPPORT` while it is `planned` — `supportedProducts()` filters
+   `status === 'planned'`, so an entry added early renders nothing. Flipping to `live` without
+   adding one ships a launched product with no support page, which is the failure this note exists
+   to prevent. (Deferral recorded 2026-07-30, from an Orrery `registry-coverage` finding.)
 6. **Post-launch watch:** manual error-console pass on the 4 browsers (Chrome, Firefox, Waterfox, Safari); Spotify 429 sanity with 2 concurrent seats.
 
 ## 7. Bundle notes
