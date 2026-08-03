@@ -1,6 +1,10 @@
 /**
  * Backend axis (00-overview: WebGPU primary, automatic WebGL2 fallback — one
- * shader codebase). The observable is `#stage[data-engine]`, set by main.tsx.
+ * shader codebase). The observable is `#stage[data-antinode-engine]`, set by
+ * main.tsx. It is deliberately NOT `data-engine`: three.js overwrites that
+ * attribute with its own `three.js r185 webgpu` string during `renderer.init()`
+ * (verified live 2026-08-02, T13), so these assertions used to read three's
+ * value rather than the app's.
  *
  * NOTE on local runs: headless Chromium here resolves to the software WebGL2
  * backend (SwiftShader), so BOTH default and `?gl=1` report `webgl2` locally —
@@ -20,12 +24,12 @@ test('default: renderer lands on a real backend (webgpu or webgl2)', async ({ pa
 
 test('?gl=1 forces the WebGL2 fallback', async ({ page }) => {
   await page.goto('/?gl=1');
-  await expect(page.locator('#stage')).toHaveAttribute('data-engine', 'webgl2', { timeout: 20_000 });
+  await expect(page.locator('#stage')).toHaveAttribute('data-antinode-engine', 'webgl2', { timeout: 20_000 });
 });
 
 test('?gpu=0 alias also forces WebGL2', async ({ page }) => {
   await page.goto('/?gpu=0');
-  await expect(page.locator('#stage')).toHaveAttribute('data-engine', 'webgl2', { timeout: 20_000 });
+  await expect(page.locator('#stage')).toHaveAttribute('data-antinode-engine', 'webgl2', { timeout: 20_000 });
 });
 
 // Chromium-only backend-comparison note: on a GPU runner default==webgpu while

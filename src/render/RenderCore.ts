@@ -6,7 +6,7 @@ import { CAMERA_BASELINE, resetCameraToBaseline } from './camera';
 import { FeatureUniforms } from './bridge/FeatureUniforms';
 import { FeedbackHelper } from './feedback/FeedbackHelper';
 import { QualityGovernor } from './governor/QualityGovernor';
-import { FrameLoop } from './loop/FrameLoop';
+import { FrameLoop, shouldAbandonRenderer } from './loop/FrameLoop';
 import { ModMatrix } from './modmatrix';
 import type { ModRoute } from './modmatrix';
 import { PostChain } from './post/PostChain';
@@ -87,6 +87,11 @@ export class RenderCore {
   /** Dev-only artificial per-frame CPU burn (ms) to exercise the governor. */
   private burnMs = 0;
 
+  /** Frames that have thrown back-to-back; reset by any frame that completes. */
+  private consecutiveFrameFailures = 0;
+  /** Latched once the renderer is given up on, so we report exactly once. */
+  private abandoned = false;
+
   private readonly renderer: WebGPURenderer;
   readonly isWebGPU: boolean;
 
@@ -105,7 +110,9 @@ export class RenderCore {
     this.resetCamera();
 
     this.registry = new SceneRegistry({ onSwapComplete: () => this.onSwapComplete() });
-    this.loop = new FrameLoop((dt) => this.tick(dt));
+    this.loop = new FrameLoop((dt) => this.tick(dt), {
+      onTickError: (err) => this.onFrameError(err),
+    });
   }
 
   /**
@@ -146,6 +153,7 @@ export class RenderCore {
     window.addEventListener('resize', this.onResize);
     this.canvas.addEventListener('webglcontextlost', this.onContextLost);
     this.canvas.addEventListener('webglcontextrestored', this.onContextRestored);
+    this.watchDeviceLoss();
   }
 
   /** Register a scene module. */
@@ -353,6 +361,59 @@ export class RenderCore {
     if (this.burnMs > 0) RenderCore.burn(this.burnMs);
 
     if (this.governor.sample(dtMs)) this.applyQuality();
+
+    // A frame that reached here rendered; any earlier throw was transient.
+    this.consecutiveFrameFailures = 0;
+  }
+
+  /**
+   * A frame threw (T13). The loop keeps scheduling — see {@link FrameLoop} — so a
+   * single bad frame no longer freezes the canvas forever. Repeated failures mean
+   * the backend itself is gone, at which point we stop driving it and say so
+   * rather than burning rAF on a dead renderer.
+   */
+  private onFrameError(err: unknown): void {
+    this.consecutiveFrameFailures += 1;
+    this.hooks.onError?.(
+      err instanceof Error ? err : new Error('Render frame failed', { cause: err }),
+    );
+    if (!shouldAbandonRenderer(this.consecutiveFrameFailures)) return;
+    this.abandon('frame-errors');
+  }
+
+  /** Stop driving a renderer we no longer believe in, and tell the host. */
+  private abandon(reason: 'frame-errors' | 'device-lost'): void {
+    if (this.abandoned) return;
+    this.abandoned = true;
+    this.loop.stop();
+    this.hooks.onToast?.('Rendering stopped after a GPU fault.');
+    this.hooks.onRendererAbandoned?.(reason);
+  }
+
+  /**
+   * Watch the WebGPU device for loss (T13).
+   *
+   * Only `webglcontextlost` was wired before, which is a *canvas* event and never
+   * fires for WebGPU. three's WebGPURenderer auto-falls back to WebGL2 only when
+   * WebGPU is unavailable at init — never after a mid-session loss — so an
+   * unhandled `device.lost` left the canvas black permanently with nothing
+   * reporting it.
+   */
+  private watchDeviceLoss(): void {
+    if (!this.isWebGPU) return;
+    // Structurally typed: `GPUDevice` is not in this project's TS lib (no
+    // @webgpu/types dependency), and we only need `.lost`.
+    const device = (
+      this.renderer.backend as {
+        device?: { lost?: Promise<{ reason: string; message: string }> };
+      }
+    ).device;
+    void device?.lost?.then((info) => {
+      // A device destroyed during our own dispose() is not a fault.
+      if (info.reason === 'destroyed') return;
+      this.hooks.onError?.(new Error(`WebGPU device lost: ${info.message || info.reason}`));
+      this.abandon('device-lost');
+    });
   }
 
   private renderFrame(): void {

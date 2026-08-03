@@ -7,7 +7,7 @@ Mark: ✅ · ⚠️ (note) · ❌ (file P0/P1). Attach evidence per row.
 
 ## Boot & render
 - [ ] App boots; landing renders.
-- [ ] **WebGPU is engaged** — `#stage[data-engine]` = `webgpu`. Evidence: ______
+- [ ] **WebGPU is engaged** — `#stage[data-antinode-engine]` = `webgpu`. Evidence: ______
 - [ ] All three scenes render and animate.
 
 ## Audio lifecycle

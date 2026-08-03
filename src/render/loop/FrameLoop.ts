@@ -11,6 +11,23 @@ export function clampDt(dtMs: number, maxMs: number = MAX_DT_MS): number {
   return Math.min(dtMs, maxMs);
 }
 
+/** Consecutive thrown frames before the renderer is treated as gone, not glitchy. */
+export const MAX_CONSECUTIVE_FRAME_FAILURES = 3;
+
+/**
+ * Failure policy: has the renderer thrown often enough in a row that we should
+ * stop driving it? One bad frame is a hiccup (a transient validation error, a
+ * scene mid-rebuild); three in a row means the backend is gone.
+ *
+ * Pure — unit-testable without a DOM or a GPU.
+ */
+export function shouldAbandonRenderer(
+  consecutiveFailures: number,
+  max: number = MAX_CONSECUTIVE_FRAME_FAILURES,
+): boolean {
+  return consecutiveFailures >= max;
+}
+
 /**
  * requestAnimationFrame driver with an explicit visibility pause.
  *
@@ -29,11 +46,14 @@ export class FrameLoop {
   private readonly maxDtMs: number;
   private readonly onVisibility = () => this.handleVisibility();
 
+  private readonly onTickError: ((err: unknown) => void) | undefined;
+
   constructor(
     private readonly onTick: (dtMs: number) => void,
-    opts?: { maxDtMs?: number },
+    opts?: { maxDtMs?: number; onTickError?: (err: unknown) => void },
   ) {
     this.maxDtMs = opts?.maxDtMs ?? MAX_DT_MS;
+    this.onTickError = opts?.onTickError;
   }
 
   /** Begin (or resume) the loop. */
@@ -71,7 +91,17 @@ export class FrameLoop {
     }
     const dt = clampDt(ts - this.lastTs, this.maxDtMs);
     this.lastTs = ts;
-    this.onTick(dt);
+    // A thrown frame must NOT kill the loop (T13). This used to call `onTick(dt)`
+    // bare, immediately before `schedule()` — so the first throw from inside
+    // three's render ended rAF forever and left a frozen black canvas with no
+    // surface reporting it. We now report and keep scheduling; the owner of
+    // `onTickError` decides when repeated failures mean "stop" (see
+    // {@link shouldAbandonRenderer}).
+    try {
+      this.onTick(dt);
+    } catch (err) {
+      this.onTickError?.(err);
+    }
     this.schedule();
   };
 

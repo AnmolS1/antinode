@@ -20,6 +20,8 @@ import {
 } from './hooks';
 import { loadRememberedSource, saveRememberedSource, snapshotCanvas } from './util';
 import { DEVICE_FIXTURES } from './dev/fixtures';
+import type { RendererDiagnosis } from '../render/renderer/diagnose';
+import { BootError } from './components/BootError';
 import { Landing } from './components/Landing';
 import { DevicePicker } from './components/DevicePicker';
 import { SignalCheck } from './components/SignalCheck';
@@ -59,12 +61,26 @@ export function App({
   engine,
   host,
   defaultSceneId,
+  bootError,
+  registerRuntimeError,
 }: {
   engine: EngineFacade;
   /** The render-backed params host (present in production; omitted in unit tests). */
   host?: ParamHost;
   /** The scene the engine boots on, so the switcher highlights it correctly. */
   defaultSceneId?: string;
+  /**
+   * Set when the render core failed to boot (T13). The app still mounts — source
+   * picking, Spotify and the chrome all work — but nothing can draw, so we say so
+   * in every phase instead of showing a silent black canvas.
+   */
+  bootError?: RendererDiagnosis;
+  /**
+   * Hands `main.tsx` a setter so a renderer that dies *after* boot (WebGPU device
+   * loss, or enough consecutive thrown frames) can still reach the screen (T13).
+   * Omitted in unit tests.
+   */
+  registerRuntimeError?: (publish: (d: RendererDiagnosis) => void) => void;
 }) {
   const capabilities = useMemo(() => engine.capabilities(), [engine]);
   const scenes = useMemo(() => engine.scenes(), [engine]);
@@ -77,6 +93,8 @@ export function App({
   const [showPerf, setShowPerf] = useState(false);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [liveMessage, setLiveMessage] = useState('');
+  /** A renderer failure that happened after boot; shown with the same panel. */
+  const [runtimeError, setRuntimeError] = useState<RendererDiagnosis | null>(null);
 
   const reducedMotion = useReducedMotion();
   const idle = useIdleFade(3000);
@@ -227,6 +245,13 @@ export function App({
 
   useKeyboardShortcuts(shortcuts, phase === 'live');
 
+  // Register once so a post-boot renderer death can surface (T13). A boot failure
+  // wins over a later one — it is the more fundamental diagnosis.
+  useEffect(() => {
+    registerRuntimeError?.(setRuntimeError);
+  }, [registerRuntimeError]);
+  const renderFailure = bootError ?? runtimeError ?? null;
+
   const rootClass = `app${reducedMotion ? ' reduced-motion' : ''}`;
   const chromeHidden = idle.hidden && !steering && !showShortcuts;
 
@@ -235,6 +260,7 @@ export function App({
     return (
       <div className={rootClass}>
         <Landing capabilities={capabilities} onPick={onPick} />
+        {renderFailure && <BootError diagnosis={renderFailure} />}
         <Toasts toasts={toasts} onDismiss={dismissToast} />
         <LiveRegion message={liveMessage} />
       </div>
@@ -257,6 +283,7 @@ export function App({
             />
           </div>
         </div>
+        {renderFailure && <BootError diagnosis={renderFailure} />}
         <Toasts toasts={toasts} onDismiss={dismissToast} />
         <LiveRegion message={liveMessage} />
       </div>
@@ -281,6 +308,7 @@ export function App({
             onBack={() => setPhase('onboarding')}
           />
         </div>
+        {renderFailure && <BootError diagnosis={renderFailure} />}
         <Toasts toasts={toasts} onDismiss={dismissToast} />
         <LiveRegion message={liveMessage} />
       </div>
@@ -388,6 +416,8 @@ export function App({
         }}
       />
 
+      {/* Outside `.chrome` on purpose — the idle fade must never hide this. */}
+      {renderFailure && <BootError diagnosis={renderFailure} />}
       <Toasts toasts={toasts} onDismiss={dismissToast} />
       <LiveRegion message={liveMessage} />
     </div>

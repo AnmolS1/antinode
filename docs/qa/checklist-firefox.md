@@ -10,7 +10,7 @@ Mark: ✅ · ⚠️ (note) · ❌ (file P0/P1). Attach evidence per row.
 - [ ] App boots; scenes render and animate.
 - [ ] **WebGPU engaged on Windows / AS-mac**; **Linux / Intel-mac falls back cleanly to
       WebGL2** with no error and no visual break. Record which path this machine took:
-      `#stage[data-engine]` = ______  (platform: ______). Evidence: ______
+      `#stage[data-antinode-engine]` = ______  (platform: ______). Evidence: ______
 
 ## Capture ladder
 - [ ] Tab / system audio rung correctly **disabled** with honest reason.

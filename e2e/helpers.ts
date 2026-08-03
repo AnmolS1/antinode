@@ -8,9 +8,14 @@
  *
  * Observability seams used here (all pre-existing in the app — no test-only hooks
  * were added to src/):
- *   • `#stage[data-engine]`  — the render backend hook, set by main.tsx to
- *     `booting|webgpu|webgl2|error`. This is the "perf-HUD/backend hook" the task
- *     references; the PerfHud's own `backend` field is a Wave-B placeholder.
+ *   • `#stage[data-antinode-engine]` — the render backend hook, set by main.tsx to
+ *     `booting|webgpu|webgl2|webgl2-recovered|error`. This is the "perf-HUD/backend
+ *     hook" the task references; the PerfHud's own `backend` field is a Wave-B
+ *     placeholder. NOT `data-engine`: three.js stamps its own
+ *     `data-engine="three.js r185 webgpu"` on the canvas during `renderer.init()`
+ *     and clobbers ours (verified live 2026-08-02, T13) — assertions on that
+ *     attribute were reading three's string and only passed because the
+ *     software-WebGL2 CI path races differently.
  *   • `.app[data-phase="live"]` — the shell has reached the live visualizer.
  *   • `.app.reduced-motion`   — the reduced-motion program is engaged (App adds
  *     the class; the engine stamps `frame.reducedMotion` and scenes read it —
@@ -38,9 +43,9 @@ export function wavBase64(absPath: string): string {
  *  the resolved backend string, guaranteed to be exactly `webgpu` or `webgl2`. */
 export async function waitForBackend(page: Page, timeout = 20_000): Promise<string> {
   await expect
-    .poll(async () => page.locator('#stage').getAttribute('data-engine'), { timeout })
-    .toMatch(/^(webgpu|webgl2)$/);
-  return (await page.locator('#stage').getAttribute('data-engine')) ?? '';
+    .poll(async () => page.locator('#stage').getAttribute('data-antinode-engine'), { timeout })
+    .toMatch(/^(webgpu|webgl2|webgl2-recovered)$/);
+  return (await page.locator('#stage').getAttribute('data-antinode-engine')) ?? '';
 }
 
 /** Boot, pick the file source with the tone fixture, and wait for the live phase. */
