@@ -1,4 +1,5 @@
 import { PerspectiveCamera, Scene } from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import type { WebGPURenderer } from 'three/webgpu';
 
 import type { EngineFacade, FrameFeatures, ParamDef, SceneContext, SceneModule } from '../contracts';
@@ -95,6 +96,10 @@ export class RenderCore {
   private readonly renderer: WebGPURenderer;
   readonly isWebGPU: boolean;
 
+  /** ONE OrbitControls on the shared camera, enabled per scene. Scenes must not
+   *  build their own — see the note on `SceneModule.cameraControls`. */
+  private controls: OrbitControls | null = null;
+
   private constructor(
     private readonly canvas: HTMLCanvasElement,
     private readonly engine: EngineFacade,
@@ -154,6 +159,19 @@ export class RenderCore {
     this.canvas.addEventListener('webglcontextlost', this.onContextLost);
     this.canvas.addEventListener('webglcontextrestored', this.onContextRestored);
     this.watchDeviceLoss();
+
+    // Guard the no-DOM path (unit tests / SSR) so we never attach dangling
+    // listeners — the same guard Heritage used before this moved up here.
+    const dom = this.renderer.domElement as HTMLElement | undefined;
+    if (dom && typeof dom.addEventListener === 'function') {
+      this.controls = new OrbitControls(this.camera, dom);
+      this.controls.enableDamping = true;
+      // Panning an origin-centred scene mostly just gets you lost.
+      this.controls.enablePan = false;
+      this.controls.enabled = false; // until a scene opts in
+      this.controls.target.set(0, 0, 0);
+      this.controls.update();
+    }
   }
 
   /** Register a scene module. */
@@ -201,6 +219,7 @@ export class RenderCore {
     if (!this.registry.isFading()) this.rebuildPost();
     this.resetSceneParams();
     this.governor.reset();
+    this.syncCameraControls();
     this.emitSceneChange(id);
   }
 
@@ -308,6 +327,8 @@ export class RenderCore {
     this.compositor.dispose();
     this.feedback.dispose();
     this.bridge.dispose();
+    this.controls?.dispose();
+    this.controls = null;
     this.renderer.dispose();
   }
 
@@ -337,6 +358,9 @@ export class RenderCore {
     this.bridge.update(f);
 
     this.registry.advanceFade(dtMs);
+
+    // enableDamping requires a per-frame update; cheap no-op when disabled.
+    if (this.controls?.enabled) this.controls.update();
 
     const active = this.registry.activeScene();
     if (active) {
@@ -533,6 +557,21 @@ export class RenderCore {
     await module.init(this.buildContext(fresh));
     this.activeThree = fresh;
     this.rebuildPost();
+    this.syncCameraControls();
+  }
+
+  /**
+   * Point the shared controls at the newly active scene. Called AFTER the
+   * baseline reset and after the scene's `init` (a scene may reframe the camera
+   * in init — Heritage does), so the controls adopt the incoming scene's own
+   * framing rather than the previous scene's orbit position.
+   */
+  private syncCameraControls(): void {
+    if (!this.controls) return;
+    const active = this.registry.activeScene();
+    this.controls.enabled = active?.cameraControls === true;
+    this.controls.target.set(0, 0, 0);
+    this.controls.update();
   }
 
   /** Busy-wait `ms` to simulate GPU/CPU load (dev governor demo only). */

@@ -51,6 +51,20 @@ export interface SceneModule {
   name: string;
   /** The parameters this scene exposes to the UI and preset system. */
   params: ParamDef[];
+  /**
+   * Opt this scene into user camera control (orbit + zoom) on the SHARED camera.
+   * Optional and default-false, so existing scenes are unaffected.
+   *
+   * There is exactly one camera, reset to baseline before every scene's `init`
+   * (that reset is the 2026-07-22 black-screen fix, where Heritage's framing
+   * leaked into the next scene and shot its geometry off-screen). Controls are
+   * therefore owned by RenderCore and merely *gated* here — a scene must never
+   * construct its own, or that leak comes straight back.
+   *
+   * Screen-space scenes (Phosphor) leave this unset: orbiting them changes
+   * nothing visible and would read as broken.
+   */
+  cameraControls?: boolean;
   /** Allocate GPU/scene resources. Called once before the first `update`. */
   init(ctx: SceneContext): Promise<void>;
   /**

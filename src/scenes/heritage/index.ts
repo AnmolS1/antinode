@@ -16,8 +16,7 @@
  * innerHeight)` canvas sizing (now framework-owned in RenderCore).
  */
 import { BufferAttribute, Group, IcosahedronGeometry, Mesh, PerspectiveCamera, type Scene } from 'three';
-import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { MeshBasicNodeMaterial, type WebGPURenderer } from 'three/webgpu';
+import { MeshBasicNodeMaterial } from 'three/webgpu';
 
 import type { FrameFeatures, ParamDef, SceneContext, SceneModule } from '../../contracts';
 import type { FeatureUniforms } from '../../render/bridge/FeatureUniforms';
@@ -75,7 +74,6 @@ export function createHeritageScene(bridge: FeatureUniforms): SceneModule {
   let outerMat: MeshBasicNodeMaterial | null = null;
   let innerMat: MeshBasicNodeMaterial | null = null;
   let innerMesh: Mesh | null = null;
-  let controls: OrbitControls | null = null;
 
   // Precomputed dedup + per-frame scratch (allocated once, reused every frame).
   let slotUnique: Int32Array | null = null;
@@ -92,6 +90,9 @@ export function createHeritageScene(bridge: FeatureUniforms): SceneModule {
     id: 'heritage',
     name: 'Heritage',
     params,
+    // Orbit + zoom on the shared camera, owned by RenderCore (see the contract
+    // note on SceneModule.cameraControls).
+    cameraControls: true,
 
     async init(ctx: SceneContext): Promise<void> {
       const scene = ctx.scene as Scene;
@@ -138,15 +139,10 @@ export function createHeritageScene(bridge: FeatureUniforms): SceneModule {
       scene.add(g);
       group = g;
 
-      // OrbitControls (three addons drive a WebGPURenderer canvas fine). Guard
-      // the no-DOM path (unit tests / SSR) so we never attach dangling listeners.
-      const renderer = ctx.renderer as WebGPURenderer;
-      const dom = renderer.domElement as HTMLElement | undefined;
-      if (dom && typeof dom.addEventListener === 'function') {
-        controls = new OrbitControls(cam, dom);
-        controls.target.set(0, 0, 0);
-        controls.update();
-      }
+      // Camera control (orbit + zoom) is opted into via `cameraControls` below
+      // and OWNED BY RenderCore on the single shared camera. Heritage used to
+      // build its own OrbitControls here; a per-scene instance is exactly how
+      // one scene's framing leaks into the next (the 2026-07-22 black-screen bug).
     },
 
     update(f: FrameFeatures, values: Record<string, unknown>, dt: number): void {
@@ -187,7 +183,6 @@ export function createHeritageScene(bridge: FeatureUniforms): SceneModule {
       }
       lastPhase = f.beat.phase;
 
-      controls?.update();
     },
 
     resize(): void {
@@ -195,8 +190,6 @@ export function createHeritageScene(bridge: FeatureUniforms): SceneModule {
     },
 
     dispose(): void {
-      controls?.dispose();
-      controls = null;
       if (group) {
         group.parent?.remove(group);
         group = null;
