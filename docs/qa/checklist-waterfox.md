@@ -9,7 +9,7 @@ evidence (screenshot/recording link) for every non-trivial row.
 
 ## Boot & render
 - [ ] App boots to the landing; wordmark + standing-wave glyph render.
-- [ ] **Renderer takes the WebGL2 path** — confirm `#stage[data-engine]` = `webgl2`
+- [ ] **Renderer takes the WebGL2 path** — confirm `#stage[data-antinode-engine]` = `webgl2`
       (open the Perf panel / inspect the canvas). Evidence: ______
 - [ ] If Waterfox's pref-flipped WebGPU engages instead, verify it works **or** force
       `?gl=1` and note which path was tested. Note: ______

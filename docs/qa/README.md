@@ -25,7 +25,7 @@ server so a post-deploy smoke can run the same specs against the live URL.
 |---|---|
 | `smoke.spec.ts` | Landing renders; `#stage` attached; render backend resolves to a real engine. |
 | `render.spec.ts` | Boot → **file source (fixture WAV)** → **each of the 3 scenes renders non-black** → param change applies (Randomize) → preset URL roundtrip → UI fade/pin → snapshot (`S`) download. **First real render verification.** |
-| `backend.spec.ts` | Backend axis: default lands on a real engine; `?gl=1` / `?gpu=0` force the WebGL2 fallback (observed via `#stage[data-engine]`). |
+| `backend.spec.ts` | Backend axis: default lands on a real engine; `?gl=1` / `?gpu=0` force the WebGL2 fallback (observed via `#stage[data-antinode-engine]`). |
 | `a11y.spec.ts` | axe (0 serious/critical) on picker / live chrome / shortcuts dialog; keyboard-only reachability; `prefers-reduced-motion` engages the low-motion program; **flashGuard** — engine onset rate over a strobe-bait fixture stays ≤ 3/s (WCAG 2.3.1). |
 | `determinism.spec.ts` | `OfflineAudioContext` → real `Analyzer` → `FrameFeatures` trace summary compared cross-engine against a committed baseline within documented tolerances. |
 | `soak.spec.ts` | Long-run soak — **nightly/manual only**, self-gated on `SOAK=1` (never per-PR). |
@@ -40,7 +40,7 @@ Fully synthetic, copyright-safe test tones (regenerate with `node e2e/fixtures/g
 
 ### Observability seams (no test-only hooks were added to `src/`)
 
-- `#stage[data-engine]` — render backend: `booting | webgpu | webgl2 | error` (set by `main.tsx`). This is the "backend hook"; the PerfHud's own `backend` field is still a Wave-B placeholder.
+- `#stage[data-antinode-engine]` — render backend: `booting | webgpu | webgl2 | webgl2-recovered | error` (set by `main.tsx`). This is the "backend hook"; the PerfHud's own `backend` field is still a Wave-B placeholder.
 - `.app[data-phase="live"]` — reached the live visualizer.
 - `.app.reduced-motion` — reduced-motion program engaged (App class; engine stamps `frame.reducedMotion`, scenes read it — no scene-internal DOM observable exists, so this is the assertion surface).
 - `.chrome.ui-hidden` — chrome idle-faded. `[data-testid="params-pane"]` — the param dock.

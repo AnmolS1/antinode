@@ -65,4 +65,11 @@ export interface PerfReadout {
 export interface RenderCoreHooks {
   onError?: (err: Error) => void;
   onToast?: (msg: string) => void;
+  /**
+   * The renderer has been given up on (T13): either enough consecutive frames
+   * threw that the backend is judged gone, or the WebGPU device reported
+   * `lost`. The frame loop is already stopped. The host should surface this —
+   * before T13 a dead renderer was indistinguishable from a black scene.
+   */
+  onRendererAbandoned?: (reason: 'frame-errors' | 'device-lost') => void;
 }

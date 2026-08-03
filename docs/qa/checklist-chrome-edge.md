@@ -7,7 +7,7 @@ Run the platform rows **per OS** you can cover; record which platform each resul
 Mark: ✅ · ⚠️ (note) · ❌ (file P0/P1). Attach evidence per row.
 
 ## Boot & render
-- [ ] App boots; **WebGPU engaged** (`#stage[data-engine]` = `webgpu`). Evidence: ______
+- [ ] App boots; **WebGPU engaged** (`#stage[data-antinode-engine]` = `webgpu`). Evidence: ______
 - [ ] All three scenes render and animate.
 
 ## Tab-capture (the headline Chromium path) — **manual, per platform**
