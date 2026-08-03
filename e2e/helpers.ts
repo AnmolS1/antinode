@@ -170,3 +170,17 @@ export async function analyzeFixture(page: Page, wavB64: string) {
     };
   }, wavB64);
 }
+
+/**
+ * Open the param dock. It defaults to COLLAPSED (owner's call — a first visit is
+ * all visual), so any test that reads the Tweakpane widgets must expand it
+ * first. Pins the UI so the 3 s idle fade cannot swallow the click.
+ */
+export async function expandParamDock(page: Page): Promise<void> {
+  await page.locator('body').press(' '); // pin
+  const toggle = page.getByRole('button', { name: /scene controls/i });
+  if ((await toggle.getAttribute('aria-expanded')) !== 'true') {
+    await toggle.click();
+  }
+  await expect(page.locator('.dock__body')).toBeVisible();
+}

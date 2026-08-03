@@ -12,6 +12,7 @@ import {
   SCENES,
   DEFAULT_SCENE,
   reachLiveWithFile,
+  expandParamDock,
   expectCanvasRenders,
 } from './helpers';
 
@@ -42,6 +43,10 @@ test.describe('render + live interaction', () => {
 
   test('a param change applies (Randomize updates the pane)', async ({ page }) => {
     await reachLiveWithFile(page);
+    // The dock ships collapsed, so the pane must be opened before its widgets
+    // can be read. (`R` still randomizes while collapsed — the pane stays
+    // mounted — but this test asserts on the visible inputs.)
+    await expandParamDock(page);
     await expect(page.locator('[data-testid="params-pane"]')).toBeVisible();
     await page.waitForTimeout(300);
 
@@ -113,11 +118,9 @@ test.describe('render + live interaction', () => {
   // visible); the assertion has to be that the box actually fits.
   test('param dock fits the viewport when expanded', async ({ page }) => {
     await reachLiveWithFile(page);
-    await page.locator('body').press(' '); // pin, so the idle fade can't eat the click
-    await page.getByRole('button', { name: /scene controls/i }).click();
+    await expandParamDock(page);
 
     const body = page.locator('.dock__body');
-    await expect(body).toBeVisible();
     const box = await body.evaluate((el) => {
       const r = el.getBoundingClientRect();
       return { top: r.top, bottom: r.bottom, viewportH: window.innerHeight };
