@@ -8,6 +8,7 @@ import {
   SRC_BINS,
   detectIndex,
   fillFrequencies,
+  HERITAGE_DEFAULT_INTENSITY,
   innerScaleFromLoud,
   spectrumCompat,
   uScaleFromLoud,
@@ -127,5 +128,39 @@ describe('loudness transfer curve', () => {
     expect(innerScaleFromLoud(0)).toBe(1);
     expect(innerScaleFromLoud(1)).toBeGreaterThan(1);
     expect(innerScaleFromLoud(0.5)).toBeLessThan(innerScaleFromLoud(1));
+  });
+});
+
+describe('heritage intensity (owner review 2026-08-02: peaks read as overpowered)', () => {
+  it('reproduces the 2023 response exactly at intensity 1', () => {
+    // The 2023 gain constants are a reconstruction of the original look and are
+    // NOT re-tuned; intensity attenuates loudNorm before them, so 1 is identity.
+    expect(innerScaleFromLoud(0.8, 1)).toBeCloseTo(innerScaleFromLoud(0.8), 12);
+    expect(uScaleFromLoud(0.8, 1)).toBeCloseTo(uScaleFromLoud(0.8), 12);
+  });
+
+  it('attenuates the peak response below 1', () => {
+    expect(innerScaleFromLoud(1, 0.6)).toBeLessThan(innerScaleFromLoud(1, 1));
+    expect(uScaleFromLoud(1, 0.6)).toBeLessThan(uScaleFromLoud(1, 1));
+  });
+
+  it('ships a default below the 2023 response', () => {
+    expect(HERITAGE_DEFAULT_INTENSITY).toBeLessThan(1);
+    expect(HERITAGE_DEFAULT_INTENSITY).toBeGreaterThan(0);
+    expect(innerScaleFromLoud(1, HERITAGE_DEFAULT_INTENSITY)).toBeLessThan(innerScaleFromLoud(1, 1));
+  });
+
+  it('leaves silence unchanged at any intensity', () => {
+    // The pulse is 1 + k*loud, so loud = 0 must be exactly 1 regardless — the
+    // quiet passages must look identical, only the peaks come down.
+    expect(innerScaleFromLoud(0, 0.2)).toBe(1);
+    expect(innerScaleFromLoud(0, 1.5)).toBe(1);
+    expect(uScaleFromLoud(0, 0.2)).toBe(0);
+  });
+
+  it('is monotonic in intensity', () => {
+    const at = (i: number): number => innerScaleFromLoud(0.9, i);
+    expect(at(0.3)).toBeLessThan(at(0.6));
+    expect(at(0.6)).toBeLessThan(at(1.2));
   });
 });

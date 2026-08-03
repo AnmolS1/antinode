@@ -37,13 +37,17 @@ export function buildHeritageGraph(bridge: FeatureUniforms) {
   // Per-frame uniforms owned by the scene (updated in `update`):
   //  - uTime: the rotation clock (old `uTime += 0.015`; NOT audio time).
   //  - uDisp: displacement-gain param (1 = faithful).
+  //  - uIntensity: beat-response gain (1 = faithful; default is lower).
   //  - uMono: palette param, 0 = color, 1 = grayscale-cubed (old `isBlack`).
   const uTime = uniform(0);
   const uDisp = uniform(1);
+  // Beat-response intensity (1 = the faithful 2023 response). Multiplies uLoud
+  // BEFORE the 2023 gain product, matching innerScaleFromLoud on the CPU side.
+  const uIntensity = uniform(1);
   const uMono = uniform(0);
 
   // uScale ≔ old frequencyAvg chain, reconstructed from loudNorm on the GPU.
-  const uScale = bridge.uLoud.mul(HERITAGE_LOUD_REF * HERITAGE_UAVG_GAIN);
+  const uScale = bridge.uLoud.mul(uIntensity).mul(HERITAGE_LOUD_REF * HERITAGE_UAVG_GAIN);
 
   // ---- outer wireframe vertex program (index.js `this.vertex`) --------------
   const aFreq = attribute<'float'>('aFrequency', 'float');
@@ -105,5 +109,5 @@ export function buildHeritageGraph(bridge: FeatureUniforms) {
   // pos = vec3(x, -y, z); resolut = pos / (radius * 10.0) + 0.05; color = resolut
   const innerColor = vec3(p.x, p.y.negate(), p.z).div(INNER_RES_DIV).add(0.05);
 
-  return { uTime, uDisp, uMono, outerPosition, outerColor, innerColor };
+  return { uTime, uDisp, uIntensity, uMono, outerPosition, outerColor, innerColor };
 }

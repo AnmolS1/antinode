@@ -24,6 +24,7 @@ import {
   COMPAT_LEN,
   detectIndex,
   fillFrequencies,
+  HERITAGE_DEFAULT_INTENSITY,
   innerScaleFromLoud,
   spectrumCompat,
 } from './mapping';
@@ -66,6 +67,18 @@ export function createHeritageScene(bridge: FeatureUniforms): SceneModule {
     // reach — routing it is a Wave-B gate seam (see report).
     { type: 'number', key: 'bloomSend', label: 'Bloom Send', min: 0, max: 1, step: 0.05, default: 0.15, modulatable: true },
     { type: 'select', key: 'spin', label: 'Spin', options: ['free', 'beat-locked'], default: 'free' },
+    // How hard the scene reacts to loudness. 1 reproduces the 2023 response
+    // exactly; the default is lower because peaks saturated (owner, 2026-08-02).
+    {
+      type: 'number',
+      key: 'intensity',
+      label: 'Intensity',
+      min: 0,
+      max: 1.5,
+      step: 0.05,
+      default: HERITAGE_DEFAULT_INTENSITY,
+      modulatable: true,
+    },
   ];
 
   let group: Group | null = null;
@@ -163,10 +176,13 @@ export function createHeritageScene(bridge: FeatureUniforms): SceneModule {
       // 2) Params → uniforms.
       const disp = values['displacement'];
       graph.uDisp.value = typeof disp === 'number' ? disp : 1;
+      const intensity =
+        typeof values['intensity'] === 'number' ? values['intensity'] : HERITAGE_DEFAULT_INTENSITY;
+      graph.uIntensity.value = intensity;
       graph.uMono.value = values['mode'] === 'mono' ? 1 : 0;
 
       // 3) Inner-shell scale pulse (old `mesh_2.scale = 1 + frequencyAvg/290`).
-      if (innerMesh) innerMesh.scale.setScalar(innerScaleFromLoud(f.loudNorm));
+      if (innerMesh) innerMesh.scale.setScalar(innerScaleFromLoud(f.loudNorm, intensity));
 
       // 4) Rotation clock. reducedMotion freezes the idle spin; the audio-driven
       //    displacement still reacts (that is content, not idle motion).

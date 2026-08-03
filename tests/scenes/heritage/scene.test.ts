@@ -26,7 +26,7 @@ describe('createHeritageScene (SceneModule contract)', () => {
     const scene = createHeritageScene(new FeatureUniforms());
     expect(scene.id).toBe('heritage');
     const keys = scene.params.map((p) => p.key);
-    expect(keys).toEqual(['mode', 'displacement', 'rotation', 'bloomSend', 'spin']);
+    expect(keys).toEqual(['mode', 'displacement', 'rotation', 'bloomSend', 'spin', 'intensity']);
     const mode = scene.params.find((p) => p.key === 'mode');
     expect(mode).toMatchObject({ type: 'select', default: 'color' });
     expect((mode as { options: string[] }).options).toEqual(['color', 'mono']);
