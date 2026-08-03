@@ -24,6 +24,24 @@
   # belt-and-suspenders for the worklet under engines that route it via worker-src.
   # NO COOP/COEP: we don't use SharedArrayBuffer and COEP would demand CORP on
   # cross-origin Spotify album art (a deliberate trade — see docs/ops.md).
+  #
+  # ── DO NOT add static.cloudflareinsights.com to script-src ──────────────────
+  # Cloudflare Web Analytics (automatic setup on the ponderance.dev zone) injects
+  # a beacon <script> into HTML responses AT THE EDGE, for browser-like requests
+  # only. It is not in our source — `antinode-dev.*.workers.dev` (different zone)
+  # has none. That injected script violates `script-src 'self' blob:` and is
+  # blocked, which logs a console error on every prod page load.
+  #
+  # The error is EXPECTED and the block is DELIBERATE (owner decision 2026-08-03):
+  # allowing the host would widen script-src to a third-party origin, making a
+  # compromise of that origin a script-execution path into the page. Dropping the
+  # beacon costs only client-side analytics, and Cloudflare's server-side zone
+  # analytics (request counts, bandwidth, status codes) still work — they need no
+  # beacon and are unaffected by CSP. So traffic is still measured, just not RUM.
+  #
+  # To silence the console error, disable automatic setup for this hostname in
+  # the Cloudflare dashboard (Web Analytics). That is zone-level and would also
+  # affect ponderance.dev, so it is the owner's call, not a code change.
   Content-Security-Policy: default-src 'self'; script-src 'self' blob:; style-src 'self' 'unsafe-inline'; connect-src 'self' https://api.spotify.com https://accounts.spotify.com; img-src 'self' data: https://i.scdn.co https://*.scdn.co; media-src 'self' blob:; worker-src 'self' blob:; frame-ancestors 'none'; base-uri 'none'; object-src 'none'; form-action 'self'
   X-Content-Type-Options: nosniff
   Referrer-Policy: strict-origin-when-cross-origin
