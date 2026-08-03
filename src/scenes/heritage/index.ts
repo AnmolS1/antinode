@@ -16,8 +16,7 @@
  * innerHeight)` canvas sizing (now framework-owned in RenderCore).
  */
 import { BufferAttribute, Group, IcosahedronGeometry, Mesh, PerspectiveCamera, type Scene } from 'three';
-import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { MeshBasicNodeMaterial, type WebGPURenderer } from 'three/webgpu';
+import { MeshBasicNodeMaterial } from 'three/webgpu';
 
 import type { FrameFeatures, ParamDef, SceneContext, SceneModule } from '../../contracts';
 import type { FeatureUniforms } from '../../render/bridge/FeatureUniforms';
@@ -25,6 +24,7 @@ import {
   COMPAT_LEN,
   detectIndex,
   fillFrequencies,
+  HERITAGE_DEFAULT_INTENSITY,
   innerScaleFromLoud,
   spectrumCompat,
 } from './mapping';
@@ -67,6 +67,18 @@ export function createHeritageScene(bridge: FeatureUniforms): SceneModule {
     // reach — routing it is a Wave-B gate seam (see report).
     { type: 'number', key: 'bloomSend', label: 'Bloom Send', min: 0, max: 1, step: 0.05, default: 0.15, modulatable: true },
     { type: 'select', key: 'spin', label: 'Spin', options: ['free', 'beat-locked'], default: 'free' },
+    // How hard the scene reacts to loudness. 1 reproduces the 2023 response
+    // exactly; the default is lower because peaks saturated (owner, 2026-08-02).
+    {
+      type: 'number',
+      key: 'intensity',
+      label: 'Intensity',
+      min: 0,
+      max: 1.5,
+      step: 0.05,
+      default: HERITAGE_DEFAULT_INTENSITY,
+      modulatable: true,
+    },
   ];
 
   let group: Group | null = null;
@@ -75,7 +87,6 @@ export function createHeritageScene(bridge: FeatureUniforms): SceneModule {
   let outerMat: MeshBasicNodeMaterial | null = null;
   let innerMat: MeshBasicNodeMaterial | null = null;
   let innerMesh: Mesh | null = null;
-  let controls: OrbitControls | null = null;
 
   // Precomputed dedup + per-frame scratch (allocated once, reused every frame).
   let slotUnique: Int32Array | null = null;
@@ -92,6 +103,9 @@ export function createHeritageScene(bridge: FeatureUniforms): SceneModule {
     id: 'heritage',
     name: 'Heritage',
     params,
+    // Orbit + zoom on the shared camera, owned by RenderCore (see the contract
+    // note on SceneModule.cameraControls).
+    cameraControls: true,
 
     async init(ctx: SceneContext): Promise<void> {
       const scene = ctx.scene as Scene;
@@ -138,15 +152,10 @@ export function createHeritageScene(bridge: FeatureUniforms): SceneModule {
       scene.add(g);
       group = g;
 
-      // OrbitControls (three addons drive a WebGPURenderer canvas fine). Guard
-      // the no-DOM path (unit tests / SSR) so we never attach dangling listeners.
-      const renderer = ctx.renderer as WebGPURenderer;
-      const dom = renderer.domElement as HTMLElement | undefined;
-      if (dom && typeof dom.addEventListener === 'function') {
-        controls = new OrbitControls(cam, dom);
-        controls.target.set(0, 0, 0);
-        controls.update();
-      }
+      // Camera control (orbit + zoom) is opted into via `cameraControls` below
+      // and OWNED BY RenderCore on the single shared camera. Heritage used to
+      // build its own OrbitControls here; a per-scene instance is exactly how
+      // one scene's framing leaks into the next (the 2026-07-22 black-screen bug).
     },
 
     update(f: FrameFeatures, values: Record<string, unknown>, dt: number): void {
@@ -167,10 +176,13 @@ export function createHeritageScene(bridge: FeatureUniforms): SceneModule {
       // 2) Params → uniforms.
       const disp = values['displacement'];
       graph.uDisp.value = typeof disp === 'number' ? disp : 1;
+      const intensity =
+        typeof values['intensity'] === 'number' ? values['intensity'] : HERITAGE_DEFAULT_INTENSITY;
+      graph.uIntensity.value = intensity;
       graph.uMono.value = values['mode'] === 'mono' ? 1 : 0;
 
       // 3) Inner-shell scale pulse (old `mesh_2.scale = 1 + frequencyAvg/290`).
-      if (innerMesh) innerMesh.scale.setScalar(innerScaleFromLoud(f.loudNorm));
+      if (innerMesh) innerMesh.scale.setScalar(innerScaleFromLoud(f.loudNorm, intensity));
 
       // 4) Rotation clock. reducedMotion freezes the idle spin; the audio-driven
       //    displacement still reacts (that is content, not idle motion).
@@ -187,7 +199,6 @@ export function createHeritageScene(bridge: FeatureUniforms): SceneModule {
       }
       lastPhase = f.beat.phase;
 
-      controls?.update();
     },
 
     resize(): void {
@@ -195,8 +206,6 @@ export function createHeritageScene(bridge: FeatureUniforms): SceneModule {
     },
 
     dispose(): void {
-      controls?.dispose();
-      controls = null;
       if (group) {
         group.parent?.remove(group);
         group = null;

@@ -34,6 +34,7 @@ export interface NamedPreset {
 
 const LS_PRESETS = 'antinode:presets';
 const LS_PANE = 'antinode:pane';
+const LS_DOCK = 'antinode:dock';
 
 // ── base64url ────────────────────────────────────────────────────────────────
 
@@ -287,6 +288,29 @@ export function savePaneFolderState(sceneId: string, folderKey: string, expanded
     const state: PaneState = isRecord(raw) ? (raw as PaneState) : {};
     (state[sceneId] ??= {})[folderKey] = expanded;
     localStorage.setItem(LS_PANE, JSON.stringify(state));
+  } catch {
+    /* best-effort */
+  }
+}
+
+/**
+ * Whether the param dock is expanded. GLOBAL, not per-scene: the dock's
+ * *contents* are already per-scene, and a container that appears and vanishes as
+ * you switch scenes reads as a glitch. Defaults to collapsed so a first visit is
+ * all visual. Anything stored that is not literally `true` counts as collapsed.
+ */
+export function loadDockOpen(): boolean {
+  try {
+    return JSON.parse(localStorage.getItem(LS_DOCK) ?? 'false') === true;
+  } catch {
+    return false;
+  }
+}
+
+/** Persist the dock's expanded state. Best-effort, like the folder state above. */
+export function saveDockOpen(open: boolean): void {
+  try {
+    localStorage.setItem(LS_DOCK, JSON.stringify(open));
   } catch {
     /* best-effort */
   }

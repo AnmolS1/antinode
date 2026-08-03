@@ -23,6 +23,7 @@ import { DEVICE_FIXTURES } from './dev/fixtures';
 import type { RendererDiagnosis } from '../render/renderer/diagnose';
 import { BootError } from './components/BootError';
 import { Landing } from './components/Landing';
+import { ParamDock } from './components/ParamDock';
 import { DevicePicker } from './components/DevicePicker';
 import { SignalCheck } from './components/SignalCheck';
 import { SteeringFlow } from './components/SteeringFlow';
@@ -32,7 +33,7 @@ import { PerfHud } from './components/PerfHud';
 import { ShortcutOverlay, type ShortcutHint } from './components/ShortcutOverlay';
 import { Toasts, type Toast } from './components/Toasts';
 import { LiveRegion } from './components/LiveRegion';
-import { ParamsPane, type PaneApi } from './params/ParamsPane';
+import type { PaneApi } from './params/ParamsPane';
 import type { ParamHost } from './params/types';
 import { decodePresetFromHash } from './params/presets';
 import './styles.css';
@@ -361,11 +362,12 @@ export function App({
           </div>
         )}
 
-        {/* Param dock (T07). The pane needs the render-backed host; without it
-            (unit tests inject no host) the slot stays empty. */}
-        <div className="dock" data-reserved-for="T07-params">
-          {host && <ParamsPane engine={engine} host={host} onReady={onPaneReady} />}
-        </div>
+        {/* Param dock (T07; boxed + collapsible as a T13 follow-up). ParamDock
+            renders the `.dock` element itself and keeps the pane mounted while
+            collapsed, so `[` / `]` / `R` keep working. The pane needs the
+            render-backed host; without it (unit tests inject no host) the body
+            stays empty. */}
+        <ParamDock engine={engine} {...(host ? { host } : {})} onReady={onPaneReady} />
 
         {FEATURE_SPOTIFY && (
           <aside className="spotify-slot">

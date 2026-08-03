@@ -509,12 +509,39 @@
   margin: 0;
 }
 
+/* The dock was `width: 0; height: 0` — a zero-size fixed anchor sitting at the
+   viewport floor. Tweakpane mounts as a static child and grows DOWNWARD from
+   there, so measured at 1280x907 the 300x380 pane started at y=891 and
+   overflowed the bottom by 364px: ~4% of it was on screen (the "Global" title
+   bar and nothing else). Give it a real box that is guaranteed to fit. */
 .dock {
   position: fixed;
   bottom: var(--space-4);
   left: var(--space-4);
-  width: 0;
-  height: 0;
+  z-index: var(--z-panel);
+  display: grid;
+  gap: var(--space-2);
+  justify-items: start;
+}
+.dock__toggle {
+  font-size: 1rem;
+  line-height: 1;
+  padding: var(--space-2) var(--space-3);
+}
+.dock__body {
+  width: 300px;
+  /* Clears the fixed topbar plus both margins, so the pane can never run off
+     the bottom however many params a scene declares. */
+  max-height: calc(100vh - 140px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+/* Tweakpane sets its own inline width on the container it creates. */
+.dock__body > * {
+  width: 100% !important;
+}
+.dock__body--hidden {
+  display: none;
 }
 
 .spotify-slot {

@@ -91,6 +91,9 @@ export function createStandingWaveScene(bridge: FeatureUniforms): SceneModule {
     id: STANDING_WAVE_ID,
     name: 'Standing Wave',
     params: [...STANDING_WAVE_PARAMS],
+    // Orbit + zoom on the shared camera, owned by RenderCore. Phosphor stays
+    // opted OUT: it is screen-space, so orbiting it would do nothing visible.
+    cameraControls: true,
 
     async init(ctx: SceneContext): Promise<void> {
       const scene = ctx.scene as Scene;

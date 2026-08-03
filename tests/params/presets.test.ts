@@ -16,6 +16,8 @@ import {
   randomize,
   renameUserPreset,
   saveUserPreset,
+  loadDockOpen,
+  saveDockOpen,
   type Preset,
 } from '../../src/ui/params/presets';
 
@@ -186,5 +188,30 @@ describe('user presets (localStorage)', () => {
     expect(listUserPresets('dev-spectrum')[0]?.name).toBe('cool');
     deleteUserPreset('dev-spectrum', 'cool');
     expect(listUserPresets('dev-spectrum')).toHaveLength(0);
+  });
+});
+
+describe('dock open state (T13 follow-up)', () => {
+  beforeEach(() => localStorage.clear());
+
+  it('defaults to collapsed so a first visit is all visual', () => {
+    expect(loadDockOpen()).toBe(false);
+  });
+
+  it('round-trips', () => {
+    saveDockOpen(true);
+    expect(loadDockOpen()).toBe(true);
+    saveDockOpen(false);
+    expect(loadDockOpen()).toBe(false);
+  });
+
+  it('falls back to collapsed on corrupt JSON', () => {
+    localStorage.setItem('antinode:dock', '{not json');
+    expect(loadDockOpen()).toBe(false);
+  });
+
+  it('treats a non-boolean stored value as collapsed', () => {
+    localStorage.setItem('antinode:dock', '"yes"');
+    expect(loadDockOpen()).toBe(false);
   });
 });

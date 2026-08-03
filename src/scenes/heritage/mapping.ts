@@ -48,21 +48,31 @@ export const HERITAGE_INNER_DIV = 290;
 export const HERITAGE_LOUD_REF = 72;
 
 /**
+ * Default beat-response intensity. Below 1 because the 2023 response saturates
+ * on peaks (owner review 2026-08-02: "overpowered", from a screenshot taken on a
+ * beat). Intensity multiplies `loudNorm` BEFORE the 2023 gain constants, which
+ * are a reconstruction of the original look and are deliberately not re-tuned:
+ * so `intensity: 1` reproduces 2023 exactly and the original is one slider away,
+ * while silence is unchanged at every setting (the pulse is `1 + k*loud`).
+ */
+export const HERITAGE_DEFAULT_INTENSITY = 0.6;
+
+/**
  * The 2023 `uScale` uniform, reconstructed from `loudNorm`.
  * `uScale = loudNorm · HERITAGE_LOUD_REF · HERITAGE_UAVG_GAIN`.
  * Exposed for tests + documentation; the live GPU path multiplies the same
  * constants onto `bridge.uLoud` (see `nodes.ts`).
  */
-export function uScaleFromLoud(loudNorm: number): number {
-  return loudNorm * HERITAGE_LOUD_REF * HERITAGE_UAVG_GAIN;
+export function uScaleFromLoud(loudNorm: number, intensity = 1): number {
+  return loudNorm * intensity * HERITAGE_LOUD_REF * HERITAGE_UAVG_GAIN;
 }
 
 /**
  * The 2023 inner-shell scale pulse, reconstructed from `loudNorm`.
  * `1 + (loudNorm · HERITAGE_LOUD_REF · HERITAGE_INNER_GAIN) / HERITAGE_INNER_DIV`.
  */
-export function innerScaleFromLoud(loudNorm: number): number {
-  return 1 + (loudNorm * HERITAGE_LOUD_REF * HERITAGE_INNER_GAIN) / HERITAGE_INNER_DIV;
+export function innerScaleFromLoud(loudNorm: number, intensity = 1): number {
+  return 1 + (loudNorm * intensity * HERITAGE_LOUD_REF * HERITAGE_INNER_GAIN) / HERITAGE_INNER_DIV;
 }
 
 /** Result of {@link detectIndex}: per-slot unique id + the unique count. */
