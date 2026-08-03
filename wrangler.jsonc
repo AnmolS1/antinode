@@ -33,5 +33,29 @@
   },
   // Per-version preview URLs for `wrangler versions upload` (PR previews).
   "preview_urls": true,
-  "observability": { "enabled": true }
+  "observability": { "enabled": true },
+
+  // ── Stable staging environment ──────────────────────────────────────────────
+  // `wrangler versions upload` mints a NEW hostname per upload, which is useless
+  // for Spotify: redirect URIs are matched byte-exactly, so an ephemeral preview
+  // URL can never complete the PKCE round-trip. This env gives a STABLE hostname
+  // to register once — https://antinode-dev.<subdomain>.workers.dev/callback.
+  //
+  // The env deliberately declares no `name`: wrangler DERIVES `<top-level>-<env>`
+  // = `antinode-dev`, which is also the estate naming convention
+  // (`<project>[-<env>]`). Consequence to respect: renaming the top-level worker
+  // silently retargets this too — see ponderance-memory/topics/cloudflare-workers.md.
+  //
+  // Still no `routes` here, at either level. A named env INHERITS top-level routes,
+  // which is the documented way a staging upload hijacks the prod domain. Prod's
+  // hostname stays a dashboard-attached Custom Domain; staging stays on workers.dev.
+  "env": {
+    "dev": {
+      "assets": {
+        "directory": "./dist",
+        "not_found_handling": "single-page-application"
+      },
+      "observability": { "enabled": true }
+    }
+  }
 }
