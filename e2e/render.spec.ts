@@ -106,6 +106,28 @@ test.describe('render + live interaction', () => {
     await expect(page.locator('.chrome')).not.toHaveClass(/ui-hidden/);
   });
 
+  // Regression for the dock-clipping bug: `.dock` used to be a 0x0 fixed anchor
+  // at the viewport floor, so Tweakpane grew downward off-screen — measured at
+  // 1280x907, the 300x380 pane overflowed the bottom by 364px with ~4% visible.
+  // Asserting "the pane is visible" would NOT have caught it (the sliver was
+  // visible); the assertion has to be that the box actually fits.
+  test('param dock fits the viewport when expanded', async ({ page }) => {
+    await reachLiveWithFile(page);
+    await page.locator('body').press(' '); // pin, so the idle fade can't eat the click
+    await page.getByRole('button', { name: /scene controls/i }).click();
+
+    const body = page.locator('.dock__body');
+    await expect(body).toBeVisible();
+    const box = await body.evaluate((el) => {
+      const r = el.getBoundingClientRect();
+      return { top: r.top, bottom: r.bottom, viewportH: window.innerHeight };
+    });
+    expect(box.bottom, `dock bottom ${box.bottom} vs viewport ${box.viewportH}`).toBeLessThanOrEqual(
+      box.viewportH + 1,
+    );
+    expect(box.top).toBeGreaterThanOrEqual(0);
+  });
+
   test('snapshot (S) downloads a PNG of the canvas', async ({ page }) => {
     await reachLiveWithFile(page);
     await page.waitForTimeout(600);
