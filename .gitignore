@@ -25,6 +25,7 @@ coverage
 # editor / OS
 .DS_Store
 *.swp
+*.code-workspace
 
 # Claude local memory buffer + agent worktrees (kept local, not shared)
 .remember/
@@ -39,5 +40,7 @@ pnpm-debug.log*
 # TouchDesigner project binaries (large .toe files stay untracked; see touchdesigner/)
 *.toe
 
-# scratch
-_to_delete/
+# T13 debug evidence (owner screenshots + chrome://gpu dumps) — reviewed in-session,
+# kept local; the findings live in antinode-plan/tasks/T13-*.md.
+screenshots/
+about-gpu-*.txt
